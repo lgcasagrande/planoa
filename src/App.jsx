@@ -302,12 +302,14 @@ function Donut({ slices, size = 140, label, sublabel }) {
 }
  
 // --- Logo ---------------------------------------------------------------------
+import logo from "./assets/logo.png";
+
 function LogoMarca() {
   const [hasLogo, setHasLogo] = useState(true);
   return (
     <div style={{ width: 36, height: 36, borderRadius: 8, overflow: "hidden", flexShrink: 0, background: "#0f172a", border: "1px solid #1e293b", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22 }}>
       {hasLogo
-        ? <img src="/logo.png" style={{ width: "100%", height: "100%", objectFit: "cover" }} onError={() => setHasLogo(false)} alt="Plano A" />
+        ? <img src={logo} style={{ width: "100%", height: "100%", objectFit: "cover" }} onError={() => setHasLogo(false)} alt="Plano A" />
         : "🐷"
       }
     </div>
