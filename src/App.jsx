@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-
+ 
 // --- Storage ------------------------------------------------------------------
 const LS_KEY = "portfolioiq_v3";
 function loadData() {
@@ -8,7 +8,7 @@ function loadData() {
 function saveData(d) {
   try { localStorage.setItem(LS_KEY, JSON.stringify(d)); } catch {}
 }
-
+ 
 // --- Constants ----------------------------------------------------------------
 const CLASSES = ["Renda Fixa", "Fundos / ETFs", "Cripto", "Ações", "Internacional", "Outro"];
 const LIQUIDEZ = ["Diária", "D+30", "D+60", "No vencimento", "Sem liquidez"];
@@ -19,7 +19,7 @@ const CLASS_COLORS = {
 };
 const BALDE_COLORS = { "Longo Prazo": "#4ade80", "Reserva de Emergência": "#60a5fa" };
 const TIPO_COLORS = { "Fixo": "#4ade80", "Variável": "#f59e0b", "Passivo": "#a78bfa" };
-
+ 
 // --- Default ------------------------------------------------------------------
 const DEFAULT = {
   config: {
@@ -68,7 +68,7 @@ const DEFAULT = {
   ultima_revisao: null, // "2025-03"
   revisao_em_andamento: null, // { passo, valores_posicoes, aportes_metas, decisoes_vencimentos }
 };
-
+ 
 // --- Utils --------------------------------------------------------------------
 const fmt = n => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 }).format(n || 0);
 const pct = n => `${(n || 0).toFixed(1)}%`;
@@ -91,7 +91,7 @@ const mesLabel = mes => {
   const meses = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
   return `${meses[+m - 1]} ${y}`;
 };
-
+ 
 function revisaoPendente(ultima_revisao) {
   if (!ultima_revisao) return true;
   const atual = mesAtual();
@@ -103,7 +103,7 @@ function diasSemRevisao(ultima_revisao) {
   const ultima = new Date(y, m - 1, 1);
   return Math.floor((new Date() - ultima) / (1000 * 60 * 60 * 24));
 }
-
+ 
 // --- Export / Import — sem dependência CDN ------------------------------------
 // Exporta como JSON (backup completo) + dispara download
 function exportarJSON(data) {
@@ -117,27 +117,27 @@ function exportarJSON(data) {
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
 }
-
+ 
 // Exporta CSV legível por humanos / Excel com todas as abas como seções
 function exportarCSV(data, rendaTotal) {
   const instMap = Object.fromEntries(data.instituicoes.map(i => [i.id, i.nome]));
   const investimento = rendaTotal * (data.config.taxa_investimento / 100);
   const totalMetas = data.metas.reduce((s, m) => s + (m.aporte_mensal_alvo || 0), 0);
   const totalBudget = data.budgets.reduce((s, b) => s + b.maximo, 0);
-
+ 
   const esc = v => {
     const s = String(v ?? "");
     return s.includes(",") || s.includes('"') || s.includes("\n") ? `"${s.replace(/"/g, '""')}"` : s;
   };
   const row = cols => cols.map(esc).join(",");
   const sep = (title) => `\n### ${title}\n`;
-
+ 
   const lines = [];
-
+ 
   lines.push(sep("POSIÇÕES"));
   lines.push(row(["Instituição","Produto","Classe de Ativo","Balde","Valor (R$)","Liquidez","Vencimento","Última Atualização"]));
   data.posicoes.forEach(p => lines.push(row([instMap[p.inst_id]||"",p.produto,p.classe,p.balde,p.valor,p.liquidez,p.vencimento||"",p.ultima_atualizacao||""])));
-
+ 
   lines.push(sep("METAS"));
   lines.push(row(["Meta","Valor Alvo (R$)","Acumulado (R$)","Aporte Mensal Alvo (R$)","Prazo","Descrição"]));
   data.metas.forEach(m => {
@@ -145,23 +145,23 @@ function exportarCSV(data, rendaTotal) {
     lines.push(row([m.nome, m.valor_alvo, acum, m.aporte_mensal_alvo, m.prazo||"", m.descricao||""]));
     (m.aportes||[]).forEach(a => lines.push(row(["  Aporte","",a.valor,"",a.mes,""])));
   });
-
+ 
   lines.push(sep("FONTES DE RENDA"));
   lines.push(row(["Fonte","Tipo","Valor Mensal (R$)"]));
   data.fontes_renda.forEach(f => lines.push(row([f.nome, f.tipo, f.valor])));
   lines.push(row(["TOTAL","",rendaTotal]));
-
+ 
   lines.push(sep("BUDGETS"));
   lines.push(row(["Categoria","Máximo Mensal (R$)","% da Renda"]));
   data.budgets.forEach(b => lines.push(row([b.categoria, b.maximo, rendaTotal>0?(b.maximo/rendaTotal*100).toFixed(1):0])));
   lines.push(row(["Investimento", investimento, data.config.taxa_investimento]));
   lines.push(row(["Metas (aportes)", totalMetas, rendaTotal>0?(totalMetas/rendaTotal*100).toFixed(1):0]));
   lines.push(row(["LIVRE / MÊS", rendaTotal-totalBudget-investimento-totalMetas, ""]));
-
+ 
   lines.push(sep("ALOCAÇÃO ALVO"));
   lines.push(row(["Classe de Ativo","Alvo (%)","Banda (%)"]));
   data.alocacao_alvo.forEach(a => lines.push(row([a.classe, a.alvo, a.banda])));
-
+ 
   lines.push(sep("POLÍTICA (IPS)"));
   lines.push(row(["Campo","Valor"]));
   const ips = data.ips; const cfg = data.config;
@@ -177,7 +177,7 @@ function exportarCSV(data, rendaTotal) {
     ["Ano da Meta", cfg.meta_ano],
     ["Última Revisão", data.ultima_revisao||"Nunca"],
   ].forEach(([k,v]) => lines.push(row([k,v])));
-
+ 
   const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -188,7 +188,7 @@ function exportarCSV(data, rendaTotal) {
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
 }
-
+ 
 // Importa JSON (backup completo)
 function importarJSON(file, onSuccess, onError) {
   const reader = new FileReader();
@@ -201,14 +201,14 @@ function importarJSON(file, onSuccess, onError) {
   };
   reader.readAsText(file);
 }
-
+ 
 // --- Shared UI ----------------------------------------------------------------
 const IS = {
   background: "#0b1120", border: "1px solid #1e293b", borderRadius: 8,
   color: "#e2e8f0", padding: "8px 11px", fontSize: 13,
   fontFamily: "'Syne', sans-serif", outline: "none", width: "100%", boxSizing: "border-box",
 };
-
+ 
 function Field({ label, children }) {
   return (
     <div>
@@ -300,7 +300,20 @@ function Donut({ slices, size = 140, label, sublabel }) {
     </svg>
   );
 }
-
+ 
+// --- Logo ---------------------------------------------------------------------
+function LogoMarca() {
+  const [hasLogo, setHasLogo] = useState(true);
+  return (
+    <div style={{ width: 36, height: 36, borderRadius: 8, overflow: "hidden", flexShrink: 0, background: "#0f172a", border: "1px solid #1e293b", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22 }}>
+      {hasLogo
+        ? <img src="/logo.png" style={{ width: "100%", height: "100%", objectFit: "cover" }} onError={() => setHasLogo(false)} alt="Plano A" />
+        : "🐷"
+      }
+    </div>
+  );
+}
+ 
 // --- TABS ---------------------------------------------------------------------
 const TABS = [
   { id: "dashboard", label: "Dashboard", icon: "◈" },
@@ -310,7 +323,7 @@ const TABS = [
   { id: "budgets", label: "Budgets", icon: "◧" },
   { id: "config", label: "Configurações", icon: "◻" },
 ];
-
+ 
 // ===============================================================================
 // APP ROOT
 // ===============================================================================
@@ -318,12 +331,19 @@ export default function App() {
   const [tab, setTab] = useState("dashboard");
   const [data, setData] = useState(null);
   const [sessaoAberta, setSessaoAberta] = useState(false);
-
+  const [oculto, setOculto] = useState(() => {
+    try { return localStorage.getItem("planoa_oculto") !== "false"; } catch { return true; }
+  });
+ 
   useEffect(() => {
     const d = loadData();
     setData(d || JSON.parse(JSON.stringify(DEFAULT)));
   }, []);
-
+ 
+  useEffect(() => {
+    try { localStorage.setItem("planoa_oculto", String(oculto)); } catch {}
+  }, [oculto]);
+ 
   useEffect(() => {
     if (!data) return;
     saveData(data);
@@ -331,14 +351,15 @@ export default function App() {
     const pendente = revisaoPendente(data.ultima_revisao);
     document.title = pendente ? "⚠ Plano A · Revisão pendente" : "◈ Plano A";
   }, [data]);
-
+ 
   if (!data) return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh", background: "#080d18", color: "#4ade80", fontFamily: "Syne" }}>
       Carregando…
     </div>
   );
-
+ 
   const up = (key, val) => setData(d => ({ ...d, [key]: val }));
+  const exibir = (n) => oculto ? "•••••" : fmt(n);
   const rendaTotal = data.fontes_renda.reduce((s, f) => s + f.valor, 0);
   const patrimTotal = data.posicoes.reduce((s, p) => s + (p.valor || 0), 0);
   const patrimoLP = data.posicoes.filter(p => p.balde === "Longo Prazo").reduce((s, p) => s + p.valor, 0);
@@ -350,7 +371,7 @@ export default function App() {
   }).filter(a => a.valor > 0);
   const vencendoBreve = data.posicoes.filter(p => { const m = mesesAte(p.vencimento); return m !== null && m >= 0 && m <= 2; });
   const pendente = revisaoPendente(data.ultima_revisao);
-
+ 
   if (sessaoAberta) {
     return (
       <SessaoGuiada
@@ -365,11 +386,11 @@ export default function App() {
       />
     );
   }
-
+ 
   return (
     <div style={{ minHeight: "100vh", background: "#080d18", fontFamily: "'Syne', 'Segoe UI', sans-serif", color: "#e2e8f0" }}>
       <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
-
+ 
       {/* Header */}
       <header style={{
         borderBottom: "1px solid #0f172a", padding: "14px 20px",
@@ -378,61 +399,44 @@ export default function App() {
         position: "sticky", top: 0, zIndex: 100,
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <div style={{ width: 36, height: 36, borderRadius: 8, background: "#0f172a", border: "1px solid #1e293b", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22 }}>🐷</div>
+          <LogoMarca />
           <div>
             <div style={{ fontWeight: 700, fontSize: 14, letterSpacing: -0.3 }}>Plano A</div>
-            <div style={{ fontSize: 10, color: "#334155", letterSpacing: 0.5 }}>v0.4</div>
+            <div style={{ fontSize: 10, color: "#334155", letterSpacing: 0.5 }}>v0.5</div>
           </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <div style={{ fontFamily: "'JetBrains Mono'", fontSize: 16, color: "#4ade80", fontWeight: 500 }}>{fmt(patrimTotal)}</div>
-
-          {/* Export buttons */}
-          <div style={{ display: "flex", gap: 4 }}>
-            <button onClick={() => exportarJSON(data)} style={{
-              background: "transparent", border: "1px solid #1e293b",
-              color: "#475569", borderRadius: "8px 0 0 8px", padding: "6px 10px", fontSize: 11,
-              fontFamily: "Syne", cursor: "pointer", borderRight: "none",
-            }} title="Backup completo — importável de volta no app">Exportar JSON</button>
-            <button onClick={() => exportarCSV(data, rendaTotal)} style={{
-              background: "transparent", border: "1px solid #1e293b",
-              color: "#475569", borderRadius: "0 8px 8px 0", padding: "6px 10px", fontSize: 11,
-              fontFamily: "Syne", cursor: "pointer",
-            }} title="Planilha legível — abrir no Excel/Sheets">Exportar CSV</button>
+          {/* Patrimônio */}
+          <div style={{ fontFamily: "'JetBrains Mono'", fontSize: 16, color: "#4ade80", fontWeight: 500, minWidth: 80, textAlign: "right" }}>
+            {exibir(patrimTotal)}
           </div>
-
-          {/* Import JSON */}
-          <label style={{
+ 
+          {/* Ocultar valores */}
+          <button onClick={() => setOculto(o => !o)} style={{
             background: "transparent", border: "1px solid #1e293b",
-            color: "#475569", borderRadius: 8, padding: "6px 10px", fontSize: 11,
-            fontFamily: "Syne", cursor: "pointer", whiteSpace: "nowrap",
-          }} title="Importar backup JSON gerado pelo app">
-            Importar JSON
-            <input type="file" accept=".json" style={{ display: "none" }} onChange={e => {
-              const file = e.target.files[0];
-              if (!file) return;
-              importarJSON(file,
-                novo => { setData(novo); alert("✓ Dados restaurados com sucesso!"); },
-                err => alert("Erro ao importar: " + err)
-              );
-              e.target.value = "";
-            }} />
-          </label>
-
+            color: oculto ? "#475569" : "#4ade80",
+            borderRadius: 8, padding: "6px 8px", fontSize: 14,
+            fontFamily: "Syne", cursor: "pointer", lineHeight: 1,
+          }} title={oculto ? "Mostrar valores" : "Ocultar valores"}>
+            {oculto ? "👁" : "🙈"}
+          </button>
+ 
+          {/* Revisão */}
           <button onClick={() => setSessaoAberta(true)} style={{
             background: pendente ? "linear-gradient(135deg,#166534,#0f4620)" : "#0f172a",
             border: `1px solid ${pendente ? "#4ade80" : "#1e293b"}`,
             color: "#4ade80", borderRadius: 8, padding: "6px 14px", fontSize: 12,
             fontFamily: "Syne", cursor: "pointer", fontWeight: pendente ? 600 : 400,
             animation: pendente ? "pulse 2s infinite" : "none",
+            whiteSpace: "nowrap",
           }}>
-            {pendente ? "⚡ Revisão pendente" : "◎ Revisão mensal"}
+            {pendente ? "⚡ Revisão" : "◎ Revisão"}
           </button>
         </div>
       </header>
-
+ 
       <style>{`@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.75} }`}</style>
-
+ 
       {/* Banner alerta */}
       {pendente && (
         <div style={{
@@ -460,7 +464,7 @@ export default function App() {
           }}>Iniciar agora →</button>
         </div>
       )}
-
+ 
       {/* Nav */}
       <nav style={{ display: "flex", gap: 2, padding: "8px 12px", borderBottom: "1px solid #0f172a", overflowX: "auto" }}>
         {TABS.map(t => (
@@ -477,25 +481,25 @@ export default function App() {
           </button>
         ))}
       </nav>
-
+ 
       <main style={{ padding: "20px 16px", maxWidth: 920, margin: "0 auto" }}>
-        {tab === "dashboard" && <Dashboard data={data} up={up} patrimTotal={patrimTotal} patrimoLP={patrimoLP} patrimoRE={patrimoRE} patrimoMetas={patrimoMetas} alocacaoReal={alocacaoReal} vencendoBreve={vencendoBreve} rendaTotal={rendaTotal} onIniciarRevisao={() => setSessaoAberta(true)} />}
-        {tab === "posicoes" && <Posicoes data={data} up={up} />}
-        {tab === "alocacao" && <Alocacao data={data} up={up} alocacaoReal={alocacaoReal} patrimoLP={patrimoLP} />}
-        {tab === "metas" && <Metas data={data} up={up} />}
-        {tab === "budgets" && <Budgets data={data} up={up} rendaTotal={rendaTotal} />}
-        {tab === "config" && <Config data={data} up={up} rendaTotal={rendaTotal} />}
+        {tab === "dashboard" && <Dashboard data={data} up={up} patrimTotal={patrimTotal} patrimoLP={patrimoLP} patrimoRE={patrimoRE} patrimoMetas={patrimoMetas} alocacaoReal={alocacaoReal} vencendoBreve={vencendoBreve} rendaTotal={rendaTotal} onIniciarRevisao={() => setSessaoAberta(true)} exibir={exibir} />}
+        {tab === "posicoes" && <Posicoes data={data} up={up} exibir={exibir} />}
+        {tab === "alocacao" && <Alocacao data={data} up={up} alocacaoReal={alocacaoReal} patrimoLP={patrimoLP} exibir={exibir} />}
+        {tab === "metas" && <Metas data={data} up={up} exibir={exibir} />}
+        {tab === "budgets" && <Budgets data={data} up={up} rendaTotal={rendaTotal} exibir={exibir} />}
+        {tab === "config" && <Config data={data} up={up} rendaTotal={rendaTotal} up_data={d => setData(d)} exibir={exibir} />}
       </main>
     </div>
   );
 }
-
+ 
 // ===============================================================================
 // SESSÃO GUIADA
 // ===============================================================================
 function SessaoGuiada({ data, up, rendaTotal, vencendoBreve, alocacaoReal, patrimoLP, onClose, onConcluir }) {
   const [passo, setPasso] = useState(() => data.revisao_em_andamento?.passo || 0);
-
+ 
   // Estado local da sessão
   const [valoresPosicoes, setValoresPosicoes] = useState(() => {
     if (data.revisao_em_andamento?.valores_posicoes) return data.revisao_em_andamento.valores_posicoes;
@@ -510,12 +514,12 @@ function SessaoGuiada({ data, up, rendaTotal, vencendoBreve, alocacaoReal, patri
     return a;
   });
   const [decisoesVenc, setDecisoesVenc] = useState(() => data.revisao_em_andamento?.decisoes_vencimentos || {});
-
+ 
   // Salva progresso da sessão
   useEffect(() => {
     up("revisao_em_andamento", { passo, valores_posicoes: valoresPosicoes, aportes_metas: aportesMetas, decisoes_vencimentos: decisoesVenc });
   }, [passo, valoresPosicoes, aportesMetas, decisoesVenc]);
-
+ 
   function concluir() {
     // Aplica posições atualizadas
     const novasPosicoes = data.posicoes.map(p => ({
@@ -539,19 +543,19 @@ function SessaoGuiada({ data, up, rendaTotal, vencendoBreve, alocacaoReal, patri
       revisao_em_andamento: null,
     });
   }
-
+ 
   const PASSOS = ["Início", "Posições", "Vencimentos", "Metas", "Resumo"];
   const metasAtivas = data.metas.filter(m => (m.aportes || []).reduce((s, a) => s + a.valor, 0) < m.valor_alvo);
   const patrimSimulado = data.posicoes.reduce((s, p) => s + (valoresPosicoes[p.id] ?? p.valor), 0);
-
+ 
   return (
     <div style={{ minHeight: "100vh", background: "#080d18", fontFamily: "'Syne', sans-serif", color: "#e2e8f0" }}>
       <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
-
+ 
       {/* Header sessão */}
       <header style={{ borderBottom: "1px solid #0f172a", padding: "14px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", background: "#080d18", position: "sticky", top: 0, zIndex: 100 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <div style={{ width: 36, height: 36, borderRadius: 8, background: "#0f172a", border: "1px solid #1e293b", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22 }}>🐷</div>
+          <LogoMarca />
           <div>
             <div style={{ fontWeight: 700, fontSize: 14 }}>Revisão Mensal</div>
             <div style={{ fontSize: 10, color: "#475569" }}>{mesLabel(mesAtual())}</div>
@@ -559,7 +563,7 @@ function SessaoGuiada({ data, up, rendaTotal, vencendoBreve, alocacaoReal, patri
         </div>
         <button onClick={onClose} style={{ background: "none", border: "none", color: "#334155", cursor: "pointer", fontSize: 13, fontFamily: "Syne" }}>← Sair sem salvar</button>
       </header>
-
+ 
       {/* Steps */}
       <div style={{ padding: "16px 20px 0", maxWidth: 700, margin: "0 auto" }}>
         <div style={{ display: "flex", gap: 0, marginBottom: 24 }}>
@@ -575,9 +579,9 @@ function SessaoGuiada({ data, up, rendaTotal, vencendoBreve, alocacaoReal, patri
           ))}
         </div>
       </div>
-
+ 
       <main style={{ padding: "0 16px 40px", maxWidth: 700, margin: "0 auto" }}>
-
+ 
         {/* PASSO 0 — INÍCIO */}
         {passo === 0 && (
           <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -611,7 +615,7 @@ function SessaoGuiada({ data, up, rendaTotal, vencendoBreve, alocacaoReal, patri
             </div>
           </div>
         )}
-
+ 
         {/* PASSO 1 — POSIÇÕES */}
         {passo === 1 && (
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
@@ -655,7 +659,7 @@ function SessaoGuiada({ data, up, rendaTotal, vencendoBreve, alocacaoReal, patri
             </div>
           </div>
         )}
-
+ 
         {/* PASSO 2 — VENCIMENTOS */}
         {passo === 2 && (
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
@@ -703,7 +707,7 @@ function SessaoGuiada({ data, up, rendaTotal, vencendoBreve, alocacaoReal, patri
             </div>
           </div>
         )}
-
+ 
         {/* PASSO 3 — METAS */}
         {passo === 3 && (
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
@@ -760,7 +764,7 @@ function SessaoGuiada({ data, up, rendaTotal, vencendoBreve, alocacaoReal, patri
             </div>
           </div>
         )}
-
+ 
         {/* PASSO 4 — RESUMO */}
         {passo === 4 && (() => {
           const novoPatrimLP = data.posicoes.filter(p => p.balde === "Longo Prazo").reduce((s, p) => s + (valoresPosicoes[p.id] ?? p.valor), 0);
@@ -775,7 +779,7 @@ function SessaoGuiada({ data, up, rendaTotal, vencendoBreve, alocacaoReal, patri
             return { ...alvo, realPct, desvio, fora: Math.abs(desvio) > alvo.banda };
           }).filter(d => d.fora);
           const totalAporteMetas = Object.values(aportesMetas).reduce((s, v) => s + (v || 0), 0);
-
+ 
           return (
             <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
               <div style={{ textAlign: "center", padding: "10px 0" }}>
@@ -783,7 +787,7 @@ function SessaoGuiada({ data, up, rendaTotal, vencendoBreve, alocacaoReal, patri
                 <div style={{ fontWeight: 700, fontSize: 18 }}>Tudo pronto para salvar</div>
                 <div style={{ fontSize: 12, color: "#475569", marginTop: 4 }}>Confira o resumo antes de concluir</div>
               </div>
-
+ 
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
                 <div style={{ background: "#0f172a", border: "1px solid #1e293b", borderRadius: 12, padding: 14 }}>
                   <div style={{ fontSize: 10, color: "#475569", textTransform: "uppercase", marginBottom: 4 }}>Patrimônio atualizado</div>
@@ -798,7 +802,7 @@ function SessaoGuiada({ data, up, rendaTotal, vencendoBreve, alocacaoReal, patri
                   <div style={{ fontSize: 11, color: "#475569", marginTop: 4 }}>{Object.values(aportesMetas).filter(v => v > 0).length} meta{Object.values(aportesMetas).filter(v => v > 0).length !== 1 ? "s" : ""} com aporte</div>
                 </div>
               </div>
-
+ 
               {/* Alocação resumo */}
               <Card title="Alocação — Longo Prazo">
                 {data.alocacao_alvo.map(alvo => {
@@ -817,7 +821,7 @@ function SessaoGuiada({ data, up, rendaTotal, vencendoBreve, alocacaoReal, patri
                   );
                 })}
               </Card>
-
+ 
               {desvios.length > 0 && (
                 <div style={{ background: "#0a0f28", border: "1px solid #1e3a8a", borderRadius: 12, padding: 14 }}>
                   <div style={{ fontSize: 12, color: "#93c5fd", fontWeight: 600, marginBottom: 6 }}>◎ Sugestão de rebalanceamento</div>
@@ -828,7 +832,7 @@ function SessaoGuiada({ data, up, rendaTotal, vencendoBreve, alocacaoReal, patri
                   ))}
                 </div>
               )}
-
+ 
               <div style={{ display: "flex", justifyContent: "space-between" }}>
                 <Btn ghost label="← Voltar" onClick={() => setPasso(3)} />
                 <Btn accent label="✓ Concluir revisão" onClick={concluir} />
@@ -840,11 +844,11 @@ function SessaoGuiada({ data, up, rendaTotal, vencendoBreve, alocacaoReal, patri
     </div>
   );
 }
-
+ 
 // ===============================================================================
 // DASHBOARD
 // ===============================================================================
-function Dashboard({ data, up, patrimTotal, patrimoLP, patrimoRE, patrimoMetas, alocacaoReal, vencendoBreve, rendaTotal, onIniciarRevisao }) {
+function Dashboard({ data, up, patrimTotal, patrimoLP, patrimoRE, patrimoMetas, alocacaoReal, vencendoBreve, rendaTotal, onIniciarRevisao, exibir }) {
   const cfg = data.config;
   const investMensal = rendaTotal * (cfg.taxa_investimento / 100);
   const reservaAlvo = rendaTotal * cfg.reserva_emergencia_meses;
@@ -860,7 +864,7 @@ function Dashboard({ data, up, patrimTotal, patrimoLP, patrimoRE, patrimoMetas, 
     { pct: patrimTotal > 0 ? (patrimoRE / patrimTotal) * 100 : 0, color: "#60a5fa" },
     { pct: patrimTotal > 0 ? (patrimoMetas / patrimTotal) * 100 : 0, color: "#fb923c" },
   ];
-
+ 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
       {/* Alertas */}
@@ -878,14 +882,14 @@ function Dashboard({ data, up, patrimTotal, patrimoLP, patrimoRE, patrimoMetas, 
           ))}
         </div>
       )}
-
+ 
       {/* KPIs */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(155px,1fr))", gap: 10 }}>
         {[
-          { label: "Patrimônio Total", val: fmt(patrimTotal), sub: `Meta: ${pct(progMeta)}`, c: "#4ade80" },
-          { label: "Longo Prazo", val: fmt(patrimoLP), sub: `${pct(patrimTotal > 0 ? patrimoLP/patrimTotal*100 : 0)} do total`, c: "#4ade80" },
-          { label: "Reserva", val: fmt(patrimoRE), sub: `Alvo ${fmt(reservaAlvo)}`, c: patrimoRE >= reservaAlvo ? "#4ade80" : "#f59e0b" },
-          { label: "Renda Mensal", val: fmt(rendaTotal), sub: `${data.fontes_renda.length} fonte${data.fontes_renda.length !== 1 ? "s" : ""}`, c: "#a78bfa" },
+          { label: "Patrimônio Total", val: exibir(patrimTotal), sub: `Meta: ${pct(progMeta)}`, c: "#4ade80" },
+          { label: "Longo Prazo", val: exibir(patrimoLP), sub: `${pct(patrimTotal > 0 ? patrimoLP/patrimTotal*100 : 0)} do total`, c: "#4ade80" },
+          { label: "Reserva", val: exibir(patrimoRE), sub: `Alvo ${exibir(reservaAlvo)}`, c: patrimoRE >= reservaAlvo ? "#4ade80" : "#f59e0b" },
+          { label: "Renda Mensal", val: exibir(rendaTotal), sub: `${data.fontes_renda.length} fonte${data.fontes_renda.length !== 1 ? "s" : ""}`, c: "#a78bfa" },
         ].map((k, i) => (
           <div key={i} style={{ background: "#0f172a", border: "1px solid #1e293b", borderRadius: 12, padding: 14 }}>
             <div style={{ fontSize: 10, color: "#334155", textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 6 }}>{k.label}</div>
@@ -894,18 +898,18 @@ function Dashboard({ data, up, patrimTotal, patrimoLP, patrimoRE, patrimoMetas, 
           </div>
         ))}
       </div>
-
+ 
       {/* Baldes + Alocação */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
         <Card title="Distribuição por Balde">
           <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-            <Donut slices={baldeSlices} size={110} />
+            <div style={{ flexShrink: 0, minWidth: 110 }}><Donut slices={baldeSlices} size={110} /></div>
             <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 8 }}>
               {[["Longo Prazo", patrimoLP, "#4ade80"], ["Reserva", patrimoRE, "#60a5fa"], ["Metas", patrimoMetas, "#fb923c"]].map(([l, v, c]) => (
                 <div key={l}>
                   <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, marginBottom: 3 }}>
                     <span style={{ color: c }}>{l}</span>
-                    <span style={{ fontFamily: "JetBrains Mono", color: "#64748b", fontSize: 11 }}>{fmt(v)}</span>
+                    <span style={{ fontFamily: "JetBrains Mono", color: "#64748b", fontSize: 11 }}>{exibir(v)}</span>
                   </div>
                   <ProgressBar value={v} max={patrimTotal} color={c} height={4} />
                 </div>
@@ -915,13 +919,13 @@ function Dashboard({ data, up, patrimTotal, patrimoLP, patrimoRE, patrimoMetas, 
         </Card>
         <Card title="Alocação LP">
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <Donut
+            <div style={{ flexShrink: 0, minWidth: 110 }}><Donut
               slices={alocacaoReal.length > 0
                 ? alocacaoReal.map(a => ({ pct: a.pct, color: CLASS_COLORS[a.classe] || "#94a3b8" }))
                 : [{ pct: 100, color: "#1e293b" }]
               }
               size={110}
-            />
+            /></div>
             <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 6 }}>
               {data.alocacao_alvo.map(alvo => {
                 const real = alocacaoReal.find(a => a.classe === alvo.classe);
@@ -941,19 +945,19 @@ function Dashboard({ data, up, patrimTotal, patrimoLP, patrimoRE, patrimoMetas, 
           </div>
         </Card>
       </div>
-
+ 
       {/* Meta patrimônio */}
       <Card title={`Meta · ${fmt(cfg.meta_patrimonio)} até ${cfg.meta_ano}`}>
         <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 6 }}>
-          <span style={{ color: "#64748b" }}>{fmt(patrimTotal)}</span>
+          <span style={{ color: "#64748b" }}>{exibir(patrimTotal)}</span>
           <span style={{ fontFamily: "JetBrains Mono", color: "#4ade80" }}>{pct(Math.min(progMeta, 100))}</span>
         </div>
         <ProgressBar value={patrimTotal} max={cfg.meta_patrimonio} color="#4ade80" height={8} />
         <div style={{ fontSize: 11, color: "#334155", marginTop: 6 }}>
-          {cfg.meta_ano - new Date().getFullYear()} anos restantes · Faltam {fmt(cfg.meta_patrimonio - patrimTotal)}
+          {cfg.meta_ano - new Date().getFullYear()} anos restantes · Faltam {exibir(cfg.meta_patrimonio - patrimTotal)}
         </div>
       </Card>
-
+ 
       {/* Metas resumo */}
       {metasAtivas.length > 0 && (
         <Card title="Metas em Andamento">
@@ -963,7 +967,7 @@ function Dashboard({ data, up, patrimTotal, patrimoLP, patrimoRE, patrimoMetas, 
               <div key={m.id} style={{ marginBottom: 10 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 4 }}>
                   <span>{m.icon} {m.nome}</span>
-                  <span style={{ fontFamily: "JetBrains Mono", color: m.cor, fontSize: 11 }}>{fmt(acum)} / {fmt(m.valor_alvo)}</span>
+                  <span style={{ fontFamily: "JetBrains Mono", color: m.cor, fontSize: 11 }}>{exibir(acum)} / {exibir(m.valor_alvo)}</span>
                 </div>
                 <ProgressBar value={acum} max={m.valor_alvo} color={m.cor} />
               </div>
@@ -974,17 +978,17 @@ function Dashboard({ data, up, patrimTotal, patrimoLP, patrimoRE, patrimoMetas, 
     </div>
   );
 }
-
+ 
 // ===============================================================================
 // POSIÇÕES
 // ===============================================================================
-function Posicoes({ data, up }) {
+function Posicoes({ data, up, exibir }) {
   const [editId, setEditId] = useState(null);
   const [novaInstForm, setNovaInstForm] = useState(false);
   const [instForm, setInstForm] = useState({ nome: "", icon: "🏦" });
   const [expandInst, setExpandInst] = useState({});
   const totalGeral = data.posicoes.reduce((s, p) => s + p.valor, 0);
-
+ 
   function savePosicao(pos) {
     if (pos.id && data.posicoes.find(p => p.id === pos.id)) {
       up("posicoes", data.posicoes.map(p => p.id === pos.id ? pos : p));
@@ -1003,7 +1007,7 @@ function Posicoes({ data, up }) {
     up("instituicoes", data.instituicoes.filter(i => i.id !== id));
     up("posicoes", data.posicoes.filter(p => p.inst_id !== id));
   }
-
+ 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -1016,7 +1020,7 @@ function Posicoes({ data, up }) {
           <Btn label="+ Posição" onClick={() => setEditId("new")} />
         </div>
       </div>
-
+ 
       {novaInstForm && (
         <Card title="Nova Instituição" accent="#4ade80">
           <div style={{ display: "grid", gridTemplateColumns: "1fr 80px", gap: 10, marginBottom: 10 }}>
@@ -1029,7 +1033,7 @@ function Posicoes({ data, up }) {
           </div>
         </Card>
       )}
-
+ 
       {editId === "new" && (
         <PosicaoForm
           pos={{ inst_id: data.instituicoes[0]?.id, produto: "", classe: CLASSES[0], balde: "Longo Prazo", valor: 0, liquidez: LIQUIDEZ[0], vencimento: "", ultima_atualizacao: mesAtual() }}
@@ -1037,7 +1041,7 @@ function Posicoes({ data, up }) {
           onSave={savePosicao} onCancel={() => setEditId(null)}
         />
       )}
-
+ 
       {data.instituicoes.map(inst => {
         const posList = data.posicoes.filter(p => p.inst_id === inst.id);
         const totalInst = posList.reduce((s, p) => s + p.valor, 0);
@@ -1051,7 +1055,7 @@ function Posicoes({ data, up }) {
                 <div style={{ fontWeight: 600, fontSize: 14 }}>{inst.nome}</div>
                 <div style={{ fontSize: 11, color: "#475569" }}>{posList.length} produto{posList.length !== 1 ? "s" : ""}</div>
               </div>
-              <div style={{ fontFamily: "JetBrains Mono", fontSize: 14, color: "#e2e8f0" }}>{fmt(totalInst)}</div>
+              <div style={{ fontFamily: "JetBrains Mono", fontSize: 14, color: "#e2e8f0" }}>{exibir(totalInst)}</div>
               <span style={{ fontSize: 11, color: "#334155" }}>{expanded ? "▲" : "▼"}</span>
             </div>
             {expanded && (
@@ -1076,7 +1080,7 @@ function Posicoes({ data, up }) {
                         </div>
                       </div>
                       <div style={{ textAlign: "right" }}>
-                        <div style={{ fontFamily: "JetBrains Mono", fontSize: 14 }}>{fmt(pos.valor)}</div>
+                        <div style={{ fontFamily: "JetBrains Mono", fontSize: 14 }}>{exibir(pos.valor)}</div>
                         <div style={{ fontSize: 10, color: "#334155" }}>{pct(totalGeral > 0 ? pos.valor / totalGeral * 100 : 0)}</div>
                       </div>
                       <div style={{ display: "flex", gap: 4 }}>
@@ -1098,7 +1102,7 @@ function Posicoes({ data, up }) {
     </div>
   );
 }
-
+ 
 function PosicaoForm({ pos, instituicoes, metas, onSave, onCancel }) {
   const [f, setF] = useState({ ...pos });
   const up = (k, v) => setF(p => ({ ...p, [k]: v }));
@@ -1132,11 +1136,11 @@ function PosicaoForm({ pos, instituicoes, metas, onSave, onCancel }) {
     </div>
   );
 }
-
+ 
 // ===============================================================================
 // ALOCAÇÃO
 // ===============================================================================
-function Alocacao({ data, up, alocacaoReal, patrimoLP }) {
+function Alocacao({ data, up, alocacaoReal, patrimoLP, exibir }) {
   const [editId, setEditId] = useState(null);
   const totalAlvo = data.alocacao_alvo.reduce((s, a) => s + a.alvo, 0);
   function updateAlvo(id, k, v) { up("alocacao_alvo", data.alocacao_alvo.map(a => a.id === id ? { ...a, [k]: v } : a)); }
@@ -1156,7 +1160,7 @@ function Alocacao({ data, up, alocacaoReal, patrimoLP }) {
         <div style={{ fontFamily: "JetBrains Mono", fontSize: 18, color: totalAlvo === 100 ? "#4ade80" : "#f59e0b" }}>{totalAlvo}%</div>
       </div>
       {totalAlvo !== 100 && <div style={{ background: "#1c1408", border: "1px solid #713f12", borderRadius: 10, padding: "10px 14px", fontSize: 12, color: "#fbbf24" }}>⚠ Soma deve ser 100%. Atual: {totalAlvo}%</div>}
-
+ 
       {/* Donuts: Alvo vs Real */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
         <Card title="Alocação Alvo">
@@ -1183,7 +1187,7 @@ function Alocacao({ data, up, alocacaoReal, patrimoLP }) {
                 ? alocacaoReal.map(a => ({ pct: a.pct, color: CLASS_COLORS[a.classe] || "#94a3b8" }))
                 : [{ pct: 100, color: "#1e293b" }]
               }
-              size={110} label="Real" sublabel={fmt(patrimoLP).replace("R$", "")}
+              size={110} label="Real" sublabel={exibir(patrimoLP).replace("R$", "")}
             />
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
               {alocacaoReal.length > 0 ? alocacaoReal.map(a => (
@@ -1237,7 +1241,7 @@ function Alocacao({ data, up, alocacaoReal, patrimoLP }) {
                     <div style={{ position: "absolute", left: 0, top: 0, height: "100%", width: `${Math.min(100, realPct)}%`, background: fora ? "#3b82f6" : color, borderRadius: 99 }} />
                     <div style={{ position: "absolute", top: -2, left: `${Math.min(100, alvo.alvo)}%`, width: 2, height: 10, background: "#ffffff30" }} />
                   </div>
-                  <div style={{ fontSize: 10, color: "#334155", marginTop: 4 }}>banda ±{alvo.banda}% · {fmt(real?.valor || 0)} em LP</div>
+                  <div style={{ fontSize: 10, color: "#334155", marginTop: 4 }}>banda ±{alvo.banda}% · {exibir(real?.valor || 0)} em LP</div>
                 </div>
               )}
             </div>
@@ -1248,16 +1252,16 @@ function Alocacao({ data, up, alocacaoReal, patrimoLP }) {
     </div>
   );
 }
-
+ 
 // ===============================================================================
 // METAS
 // ===============================================================================
-function Metas({ data, up }) {
+function Metas({ data, up, exibir }) {
   const [editId, setEditId] = useState(null);
   const [showNew, setShowNew] = useState(false);
   const [aporteForm, setAporteForm] = useState({});
   const CORES = ["#4ade80", "#60a5fa", "#818cf8", "#fb923c", "#f472b6", "#facc15", "#34d399", "#f87171"];
-
+ 
   function saveMeta(form) {
     if (form.id && data.metas.find(m => m.id === form.id)) up("metas", data.metas.map(m => m.id === form.id ? form : m));
     else up("metas", [...data.metas, { ...form, id: Date.now(), aportes: [] }]);
@@ -1270,7 +1274,7 @@ function Metas({ data, up }) {
   function delAporte(metaId, aid) {
     up("metas", data.metas.map(m => m.id === metaId ? { ...m, aportes: m.aportes.filter(a => a.id !== aid) } : m));
   }
-
+ 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -1307,7 +1311,7 @@ function Metas({ data, up }) {
                 </div>
               </div>
               <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 6 }}>
-                <span style={{ color: "#94a3b8" }}>{fmt(acum)} <span style={{ color: "#334155" }}>/ {fmt(m.valor_alvo)}</span></span>
+                <span style={{ color: "#94a3b8" }}>{exibir(acum)} <span style={{ color: "#334155" }}>/ {exibir(m.valor_alvo)}</span></span>
                 <span style={{ fontFamily: "JetBrains Mono", color: m.cor, fontWeight: 600 }}>{pct(prog)}</span>
               </div>
               <div style={{ background: "#1e293b", borderRadius: 99, height: 8, overflow: "hidden", marginBottom: 10 }}>
@@ -1326,7 +1330,7 @@ function Metas({ data, up }) {
                     {[...(m.aportes || [])].sort((a, b) => b.mes.localeCompare(a.mes)).map(a => (
                       <div key={a.id} style={{ background: "#0a0f1a", border: "1px solid #1e293b", borderRadius: 6, padding: "3px 8px", fontSize: 11, display: "flex", gap: 6, alignItems: "center" }}>
                         <span style={{ color: "#475569" }}>{a.mes}</span>
-                        <span style={{ color: "#94a3b8", fontFamily: "JetBrains Mono" }}>{fmt(a.valor)}</span>
+                        <span style={{ color: "#94a3b8", fontFamily: "JetBrains Mono" }}>{exibir(a.valor)}</span>
                         <button onClick={() => delAporte(m.id, a.id)} style={{ background: "none", border: "none", color: "#334155", cursor: "pointer", fontSize: 10 }}>✕</button>
                       </div>
                     ))}
@@ -1361,7 +1365,7 @@ function Metas({ data, up }) {
     </div>
   );
 }
-
+ 
 function MetaFormComp({ meta, cores, onSave, onCancel }) {
   const [f, setF] = useState(meta || { nome: "", icon: "🎯", cor: "#818cf8", valor_alvo: 0, prazo: "", aporte_mensal_alvo: 0, descricao: "" });
   const up = (k, v) => setF(p => ({ ...p, [k]: v }));
@@ -1389,32 +1393,32 @@ function MetaFormComp({ meta, cores, onSave, onCancel }) {
     </div>
   );
 }
-
+ 
 // ===============================================================================
 // BUDGETS
 // ===============================================================================
-function Budgets({ data, up, rendaTotal }) {
+function Budgets({ data, up, rendaTotal, exibir }) {
   const [editId, setEditId] = useState(null);
   const cfg = data.config;
   const investimento = rendaTotal * (cfg.taxa_investimento / 100);
   const totalMetas = data.metas.reduce((s, m) => s + (m.aporte_mensal_alvo || 0), 0);
   const totalBudget = data.budgets.reduce((s, b) => s + b.maximo, 0);
   const livre = rendaTotal - investimento - totalMetas - totalBudget;
-
+ 
   function upB(id, k, v) { up("budgets", data.budgets.map(b => b.id === id ? { ...b, [k]: v } : b)); }
   function delB(id) { up("budgets", data.budgets.filter(b => b.id !== id)); }
   function addB() { const id = Date.now(); up("budgets", [...data.budgets, { id, categoria: "Nova", maximo: 0, icon: "📦" }]); setEditId(id); }
-
+ 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
       <div style={{ fontWeight: 700, fontSize: 16 }}>Budgets por Categoria</div>
       <div style={{ fontSize: 12, color: "#475569" }}>Tetos máximos mensais · investimento e metas já descontados da renda</div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 10 }}>
         {[
-          { label: "Renda", val: fmt(rendaTotal), c: "#e2e8f0" },
-          { label: `Investimento (${cfg.taxa_investimento}%)`, val: fmt(investimento), c: "#4ade80" },
-          { label: `Metas (${data.metas.length})`, val: fmt(totalMetas), c: "#fb923c" },
-          { label: "Livre / mês", val: fmt(livre), c: livre >= 0 ? "#e2e8f0" : "#f87171" },
+          { label: "Renda", val: exibir(rendaTotal), c: "#e2e8f0" },
+          { label: `Investimento (${cfg.taxa_investimento}%)`, val: exibir(investimento), c: "#4ade80" },
+          { label: `Metas (${data.metas.length})`, val: exibir(totalMetas), c: "#fb923c" },
+          { label: "Livre / mês", val: exibir(livre), c: livre >= 0 ? "#e2e8f0" : "#f87171" },
         ].map((k, i) => (
           <div key={i} style={{ background: "#0f172a", border: "1px solid #1e293b", borderRadius: 10, padding: 12 }}>
             <div style={{ fontSize: 10, color: "#334155", marginBottom: 4, textTransform: "uppercase" }}>{k.label}</div>
@@ -1451,7 +1455,7 @@ function Budgets({ data, up, rendaTotal }) {
                   <ProgressBar value={b.maximo} max={rendaTotal} color={`hsl(${200 + i * 35},60%,50%)`} />
                 </div>
                 <div style={{ fontFamily: "JetBrains Mono", fontSize: 13, textAlign: "right" }}>
-                  {fmt(b.maximo)}
+                  {exibir(b.maximo)}
                   <div style={{ fontSize: 10, color: "#334155" }}>{pct(rendaTotal > 0 ? b.maximo / rendaTotal * 100 : 0)}</div>
                 </div>
                 <span style={{ color: "#334155", fontSize: 12 }}>✎</span>
@@ -1464,16 +1468,16 @@ function Budgets({ data, up, rendaTotal }) {
     </div>
   );
 }
-
+ 
 // ===============================================================================
 // CONFIG (IPS + Fontes de Renda + Parâmetros)
 // ===============================================================================
-function Config({ data, up, rendaTotal }) {
+function Config({ data, up, rendaTotal, up_data, exibir }) {
   const [editFonteId, setEditFonteId] = useState(null);
   const ips = data.ips;
   const upI = (k, v) => up("ips", { ...ips, [k]: v });
   const filled = [ips.objetivo.length > 20, ips.horizonte.length > 3, ips.tolerancia, ips.regra_rebalanceamento.length > 5].filter(Boolean).length;
-
+ 
   function upFonte(id, k, v) { up("fontes_renda", data.fontes_renda.map(f => f.id === id ? { ...f, [k]: v } : f)); }
   function delFonte(id) { up("fontes_renda", data.fontes_renda.filter(f => f.id !== id)); }
   function addFonte() {
@@ -1481,10 +1485,44 @@ function Config({ data, up, rendaTotal }) {
     up("fontes_renda", [...data.fontes_renda, { id, nome: "Nova Fonte", valor: 0, tipo: "Fixo", icon: "💰" }]);
     setEditFonteId(id);
   }
-
+ 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-
+ 
+      {/* EXPORT / IMPORT */}
+      <div>
+        <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 12 }}>Backup de Dados</div>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <button onClick={() => exportarJSON(data)} style={{
+            background: "#0f172a", border: "1px solid #1e293b",
+            color: "#4ade80", borderRadius: 8, padding: "8px 14px", fontSize: 12,
+            fontFamily: "Syne", cursor: "pointer",
+          }}>⬇ Exportar JSON</button>
+          <button onClick={() => exportarCSV(data, rendaTotal)} style={{
+            background: "#0f172a", border: "1px solid #1e293b",
+            color: "#4ade80", borderRadius: 8, padding: "8px 14px", fontSize: 12,
+            fontFamily: "Syne", cursor: "pointer",
+          }}>⬇ Exportar CSV</button>
+          <label style={{
+            background: "#0f172a", border: "1px solid #1e293b",
+            color: "#60a5fa", borderRadius: 8, padding: "8px 14px", fontSize: 12,
+            fontFamily: "Syne", cursor: "pointer",
+          }}>
+            ⬆ Importar JSON
+            <input type="file" accept=".json" style={{ display: "none" }} onChange={e => {
+              const file = e.target.files[0];
+              if (!file) return;
+              importarJSON(file,
+                novo => { up_data(novo); alert("✓ Dados restaurados!"); },
+                err => alert("Erro: " + err)
+              );
+              e.target.value = "";
+            }} />
+          </label>
+        </div>
+        <div style={{ fontSize: 11, color: "#334155", marginTop: 8 }}>JSON = backup completo reimportável · CSV = planilha legível no Excel/Sheets</div>
+      </div>
+ 
       {/* FONTES DE RENDA */}
       <div>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
@@ -1517,7 +1555,7 @@ function Config({ data, up, rendaTotal }) {
                     <div style={{ fontSize: 13, fontWeight: 500 }}>{f.nome}</div>
                     <Tag label={f.tipo} color={TIPO_COLORS[f.tipo] || "#94a3b8"} />
                   </div>
-                  <div style={{ fontFamily: "JetBrains Mono", fontSize: 14, color: "#e2e8f0" }}>{fmt(f.valor)}</div>
+                  <div style={{ fontFamily: "JetBrains Mono", fontSize: 14, color: "#e2e8f0" }}>{exibir(f.valor)}</div>
                   <span style={{ color: "#334155", fontSize: 12 }}>✎</span>
                 </div>
               )}
@@ -1525,11 +1563,11 @@ function Config({ data, up, rendaTotal }) {
           ))}
           <div style={{ background: "#0f172a", border: "1px solid #1e3a5f", borderRadius: 10, padding: "10px 14px", display: "flex", justifyContent: "space-between", fontSize: 13 }}>
             <span style={{ color: "#475569" }}>Total mensal</span>
-            <span style={{ fontFamily: "JetBrains Mono", color: "#4ade80", fontWeight: 600 }}>{fmt(rendaTotal)}</span>
+            <span style={{ fontFamily: "JetBrains Mono", color: "#4ade80", fontWeight: 600 }}>{exibir(rendaTotal)}</span>
           </div>
         </div>
       </div>
-
+ 
       {/* PARÂMETROS */}
       <div>
         <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 12 }}>Parâmetros</div>
@@ -1540,7 +1578,7 @@ function Config({ data, up, rendaTotal }) {
           <Input label="Ano da Meta" type="number" value={data.config.meta_ano} onChange={v => up("config", { ...data.config, meta_ano: +v })} />
         </div>
       </div>
-
+ 
       {/* IPS */}
       <div>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
