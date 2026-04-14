@@ -1,15 +1,40 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 
 // --- Storage ------------------------------------------------------------------
 const LS_KEY = "portfolioiq_v3";
+function normalizeData(d) {
+  if (!d || typeof d !== "object") return d;
+  // Backward compat: add new fields if missing from old JSON
+  if (!d.ferramentas) d.ferramentas = [];
+  if (!d.ips) d.ips = { objetivo: "", horizonte: "", tolerancia: "Moderado", regra_rebalanceamento: "", principios: "" };
+  if (!d.ips.regra_rebalanceamento) d.ips.regra_rebalanceamento = "Trimestral ou quando desvio > 5%";
+  if (!d.ips.tolerancia) d.ips.tolerancia = "Moderado";
+  if (!Array.isArray(d.posicoes)) d.posicoes = [];
+  d.posicoes = d.posicoes.map(p => {
+    const base = { ...p, indexacao: p?.indexacao ?? "" };
+    if (!Array.isArray(base.historico_valor)) base.historico_valor = [];
+    if (base.historico_valor.length === 0 && base.valor && base.ultima_atualizacao) {
+      base.historico_valor = [{ mes: base.ultima_atualizacao, valor: base.valor }];
+    }
+    return base;
+  });
+  if (!Array.isArray(d.bens)) d.bens = [];
+  d.bens = d.bens.map(b => {
+    const base = { ...b };
+    if (!Array.isArray(base.historico_valor)) base.historico_valor = [];
+    if (base.historico_valor.length === 0 && base.valor && base.ultima_atualizacao) {
+      base.historico_valor = [{ mes: base.ultima_atualizacao, valor: base.valor }];
+    }
+    return base;
+  });
+  return d;
+}
 function loadData() {
   try {
     const r = localStorage.getItem(LS_KEY);
     if (!r) return null;
     const d = JSON.parse(r);
-    // Backward compat: add new fields if missing from old JSON
-    if (!d.ferramentas) d.ferramentas = [];
-    return d;
+    return normalizeData(d);
   } catch { return null; }
 }
 function saveData(d) {
@@ -17,15 +42,23 @@ function saveData(d) {
 }
 
 // --- Constants ----------------------------------------------------------------
-const CLASSES = ["Renda Fixa", "Fundos / ETFs", "Cripto", "Ações", "Internacional", "Outro"];
+const CLASSES = ["Renda Fixa", "Fundos / ETFs", "Cripto", "Ações", "Internacional", "FIIs", "Outro"];
 const LIQUIDEZ = ["Diária", "D+30", "D+60", "No vencimento", "Sem liquidez"];
+const INDEXACAO = ["", "Pós-fixado", "Inflação", "Prefixado"];
+const BALDES_INV = ["Curto Prazo", "Médio Prazo", "Longo Prazo"]; // mantém "Longo Prazo" como no JSON existente
 const TIPOS_RENDA = ["Fixo", "Variável", "Passivo"];
 const CLASS_COLORS = {
   "Renda Fixa": "#4ade80", "Fundos / ETFs": "#60a5fa", "Cripto": "#f59e0b",
   "Ações": "#f472b6", "Internacional": "#a78bfa", "Outro": "#94a3b8",
+  "FIIs": "#38bdf8",
 };
-const BALDE_COLORS = { "Longo Prazo": "#4ade80", "Reserva de Emergência": "#60a5fa" };
+const BALDE_COLORS = { "Curto Prazo": "#34d399", "Médio Prazo": "#22c55e", "Longo Prazo": "#4ade80", "Reserva de Emergência": "#60a5fa" };
 const TIPO_COLORS = { "Fixo": "#4ade80", "Variável": "#f59e0b", "Passivo": "#a78bfa" };
+const COLOR_BENS_IMOVEIS = "#c084fc";
+const ALERTA_BENS_MESES = 12;
+const MESES_RET_HIST_POSICOES = 36;
+const MESES_RET_HIST_BENS = 240;
+const MESES_REND_BENS = 60;
 
 // --- Default ------------------------------------------------------------------
 const DEFAULT = {
@@ -74,6 +107,7 @@ const DEFAULT = {
   ],
   ultima_revisao: null,
   revisao_em_andamento: null,
+  bens: [],
   ferramentas: [
     { id: 1, nome: "Status Invest", url: "https://statusinvest.com.br" },
     { id: 2, nome: "Tesouro Direto", url: "https://www.tesourodireto.com.br" },
@@ -102,6 +136,36 @@ const mesLabel = mes => {
   const meses = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
   return `${meses[+m - 1]} ${y}`;
 };
+
+function mesAdd(ym, deltaMeses) {
+  const [y, m] = ym.split("-").map(Number);
+  const d = new Date(y, m - 1 + deltaMeses, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
+/** Append/replace snapshot do mês e poda por retenção (meses a partir de mesAtual). */
+function appendHistoricoValor(hist, mes, valor, retencaoMeses) {
+  const h = Array.isArray(hist) ? [...hist] : [];
+  const idx = h.findIndex(x => x.mes === mes);
+  if (idx >= 0) h[idx] = { mes, valor };
+  else h.push({ mes, valor });
+  h.sort((a, b) => a.mes.localeCompare(b.mes));
+  const cut = mesAdd(mesAtual(), -retencaoMeses);
+  return h.filter(x => x.mes >= cut);
+}
+
+function valorNoHistoricoEmOuAntes(hist, mesLimite) {
+  const sorted = [...(hist || [])].filter(x => x.mes <= mesLimite).sort((a, b) => b.mes.localeCompare(a.mes));
+  return sorted[0]?.valor;
+}
+
+/** Retorno % simples: valor atual vs referência há `mesesAtras` meses. */
+function rendimentoHistorico(valorAtual, hist, mesesAtras) {
+  const mesRef = mesAdd(mesAtual(), -mesesAtras);
+  const vRef = valorNoHistoricoEmOuAntes(hist, mesRef);
+  if (vRef == null || vRef === 0) return null;
+  return ((valorAtual - vRef) / vRef) * 100;
+}
 
 function revisaoPendente(ultima_revisao) {
   if (!ultima_revisao) return true;
@@ -146,8 +210,12 @@ function exportarCSV(data, rendaTotal) {
   const lines = [];
 
   lines.push(sep("POSIÇÕES"));
-  lines.push(row(["Instituição","Produto","Classe de Ativo","Balde","Valor (R$)","Liquidez","Vencimento","Última Atualização"]));
-  data.posicoes.forEach(p => lines.push(row([instMap[p.inst_id]||"",p.produto,p.classe,p.balde,p.valor,p.liquidez,p.vencimento||"",p.ultima_atualizacao||""])));
+  lines.push(row(["Instituição","Produto","Classe de Ativo","Indexação","Balde","Valor (R$)","Liquidez","Vencimento","Última Atualização"]));
+  data.posicoes.forEach(p => lines.push(row([instMap[p.inst_id]||"",p.produto,p.classe,p.indexacao||"",p.balde,p.valor,p.liquidez,p.vencimento||"",p.ultima_atualizacao||""])));
+
+  lines.push(sep("BENS E IMÓVEIS"));
+  lines.push(row(["Tipo","Produto","Valor (R$)","Liquidez","Última Atualização"]));
+  (data.bens || []).forEach(b => lines.push(row([b.tipo === "imovel" ? "Imóvel" : "Bem", b.produto, b.valor, b.liquidez, b.ultima_atualizacao || ""])));
 
   lines.push(sep("METAS"));
   lines.push(row(["Meta","Valor Alvo (R$)","Acumulado (R$)","Aporte Mensal Alvo (R$)","Prazo","Descrição"]));
@@ -207,7 +275,7 @@ function importarJSON(file, onSuccess, onError) {
     try {
       const novo = JSON.parse(e.target.result);
       if (!novo.posicoes || !novo.metas || !novo.config) throw new Error("Arquivo inválido ou incompleto.");
-      onSuccess(novo);
+      onSuccess(normalizeData(novo));
     } catch(err) { onError(err.message); }
   };
   reader.readAsText(file);
@@ -332,6 +400,7 @@ const TABS = [
   { id: "dashboard", label: "Dashboard", icon: "◈" },
   { id: "posicoes", label: "Posições", icon: "◐" },
   { id: "alocacao", label: "Alocação", icon: "◎" },
+  { id: "bens", label: "Bens e Imóveis", icon: "◆" },
   { id: "metas", label: "Metas", icon: "◉" },
   { id: "budgets", label: "Budgets", icon: "◧" },
   { id: "ferramentas", label: "Ferramentas", icon: "◫" },
@@ -375,13 +444,17 @@ export default function App() {
   const up = (key, val) => setData(d => ({ ...d, [key]: val }));
   const exibir = (n) => oculto ? "•••••" : fmt(n);
   const rendaTotal = data.fontes_renda.reduce((s, f) => s + f.valor, 0);
-  const patrimTotal = data.posicoes.reduce((s, p) => s + (p.valor || 0), 0);
+  const patrimBens = (data.bens || []).reduce((s, b) => s + (b.valor || 0), 0);
+  const patrimTotal = data.posicoes.reduce((s, p) => s + (p.valor || 0), 0) + patrimBens;
+  const patrimoCP = data.posicoes.filter(p => p.balde === "Curto Prazo").reduce((s, p) => s + p.valor, 0);
+  const patrimoMP = data.posicoes.filter(p => p.balde === "Médio Prazo").reduce((s, p) => s + p.valor, 0);
   const patrimoLP = data.posicoes.filter(p => p.balde === "Longo Prazo").reduce((s, p) => s + p.valor, 0);
+  const patrimoInv = patrimoCP + patrimoMP + patrimoLP;
   const patrimoRE = data.posicoes.filter(p => p.balde === "Reserva de Emergência").reduce((s, p) => s + p.valor, 0);
-  const patrimoMetas = data.posicoes.filter(p => p.balde !== "Longo Prazo" && p.balde !== "Reserva de Emergência").reduce((s, p) => s + p.valor, 0);
+  const patrimoMetas = data.posicoes.filter(p => !BALDES_INV.includes(p.balde) && p.balde !== "Reserva de Emergência").reduce((s, p) => s + p.valor, 0);
   const alocacaoReal = CLASSES.map(c => {
-    const val = data.posicoes.filter(p => p.balde === "Longo Prazo" && p.classe === c).reduce((s, p) => s + p.valor, 0);
-    return { classe: c, valor: val, pct: patrimoLP > 0 ? (val / patrimoLP) * 100 : 0 };
+    const val = data.posicoes.filter(p => BALDES_INV.includes(p.balde) && p.classe === c).reduce((s, p) => s + p.valor, 0);
+    return { classe: c, valor: val, pct: patrimoInv > 0 ? (val / patrimoInv) * 100 : 0 };
   }).filter(a => a.valor > 0);
   const vencendoBreve = data.posicoes.filter(p => { const m = mesesAte(p.vencimento); return m !== null && m >= 0 && m <= 2; });
   const pendente = revisaoPendente(data.ultima_revisao);
@@ -394,7 +467,7 @@ export default function App() {
         rendaTotal={rendaTotal}
         vencendoBreve={vencendoBreve}
         alocacaoReal={alocacaoReal}
-        patrimoLP={patrimoLP}
+        patrimoLP={patrimoInv}
         onClose={() => setSessaoAberta(false)}
         onConcluir={(novosDados) => { setData(novosDados); setSessaoAberta(false); }}
       />
@@ -416,7 +489,7 @@ export default function App() {
           <LogoMarca />
           <div>
             <div style={{ fontWeight: 700, fontSize: 14, letterSpacing: -0.3 }}>Plano A</div>
-            <div style={{ fontSize: 10, color: "#334155", letterSpacing: 0.5 }}>v0.6</div>
+            <div style={{ fontSize: 10, color: "#334155", letterSpacing: 0.5 }}>v0.7</div>
           </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -497,9 +570,10 @@ export default function App() {
       </nav>
 
       <main style={{ padding: "20px 16px", maxWidth: 920, margin: "0 auto" }}>
-        {tab === "dashboard" && <Dashboard data={data} up={up} patrimTotal={patrimTotal} patrimoLP={patrimoLP} patrimoRE={patrimoRE} patrimoMetas={patrimoMetas} alocacaoReal={alocacaoReal} vencendoBreve={vencendoBreve} rendaTotal={rendaTotal} onIniciarRevisao={() => setSessaoAberta(true)} exibir={exibir} />}
+        {tab === "dashboard" && <Dashboard data={data} up={up} patrimTotal={patrimTotal} patrimBens={patrimBens} patrimoInv={patrimoInv} patrimoCP={patrimoCP} patrimoMP={patrimoMP} patrimoLP={patrimoLP} patrimoRE={patrimoRE} patrimoMetas={patrimoMetas} alocacaoReal={alocacaoReal} vencendoBreve={vencendoBreve} rendaTotal={rendaTotal} onIniciarRevisao={() => setSessaoAberta(true)} exibir={exibir} />}
         {tab === "posicoes" && <Posicoes data={data} up={up} exibir={exibir} />}
-        {tab === "alocacao" && <Alocacao data={data} up={up} alocacaoReal={alocacaoReal} patrimoLP={patrimoLP} exibir={exibir} />}
+        {tab === "alocacao" && <Alocacao data={data} up={up} alocacaoReal={alocacaoReal} patrimoInv={patrimoInv} exibir={exibir} />}
+        {tab === "bens" && <BensImoveis data={data} up={up} exibir={exibir} />}
         {tab === "metas" && <Metas data={data} up={up} exibir={exibir} />}
         {tab === "budgets" && <Budgets data={data} up={up} rendaTotal={rendaTotal} exibir={exibir} />}
         {tab === "ferramentas" && <Ferramentas data={data} up={up} />}
@@ -529,30 +603,59 @@ function SessaoGuiada({ data, up, rendaTotal, vencendoBreve, alocacaoReal, patri
     return a;
   });
   const [decisoesVenc, setDecisoesVenc] = useState(() => data.revisao_em_andamento?.decisoes_vencimentos || {});
+  const [valoresBens, setValoresBens] = useState(() => {
+    if (data.revisao_em_andamento?.valores_bens) return data.revisao_em_andamento.valores_bens;
+    const v = {};
+    (data.bens || []).forEach(b => { v[b.id] = b.valor; });
+    return v;
+  });
 
   // Salva progresso da sessão
   useEffect(() => {
-    up("revisao_em_andamento", { passo, valores_posicoes: valoresPosicoes, aportes_metas: aportesMetas, decisoes_vencimentos: decisoesVenc });
-  }, [passo, valoresPosicoes, aportesMetas, decisoesVenc]);
+    up("revisao_em_andamento", { passo, valores_posicoes: valoresPosicoes, aportes_metas: aportesMetas, decisoes_vencimentos: decisoesVenc, valores_bens: valoresBens });
+  }, [passo, valoresPosicoes, aportesMetas, decisoesVenc, valoresBens]);
 
   function concluir() {
-    // Aplica posições atualizadas
-    const novasPosicoes = data.posicoes.map(p => ({
-      ...p,
-      valor: valoresPosicoes[p.id] ?? p.valor,
-      ultima_atualizacao: mesAtual(),
-    }));
+    const mes = mesAtual();
+    // Aplica posições atualizadas + histórico
+    const novasPosicoes = data.posicoes.map(p => {
+      const nv = valoresPosicoes[p.id] ?? p.valor;
+      let hist = p.historico_valor || [];
+      if (nv !== p.valor) {
+        hist = appendHistoricoValor(hist, mes, nv, MESES_RET_HIST_POSICOES);
+      }
+      return {
+        ...p,
+        valor: nv,
+        ultima_atualizacao: mes,
+        historico_valor: hist,
+      };
+    });
+    const novosBens = (data.bens || []).map(b => {
+      const nv = valoresBens[b.id] ?? b.valor;
+      let hist = b.historico_valor || [];
+      if (nv !== b.valor) {
+        hist = appendHistoricoValor(hist, mes, nv, MESES_RET_HIST_BENS);
+      }
+      return {
+        ...b,
+        valor: nv,
+        ultima_atualizacao: nv !== b.valor ? mes : (b.ultima_atualizacao || mes),
+        historico_valor: hist,
+      };
+    });
     // Aplica aportes de metas
     const novasMetas = data.metas.map(m => {
       const valor = aportesMetas[m.id];
       if (!valor || valor <= 0) return m;
-      const jaExiste = (m.aportes || []).find(a => a.mes === mesAtual());
+      const jaExiste = (m.aportes || []).find(a => a.mes === mes);
       if (jaExiste) return m;
-      return { ...m, aportes: [...(m.aportes || []), { id: Date.now() + m.id, mes: mesAtual(), valor }] };
+      return { ...m, aportes: [...(m.aportes || []), { id: Date.now() + m.id, mes, valor }] };
     });
     onConcluir({
       ...data,
       posicoes: novasPosicoes,
+      bens: novosBens,
       metas: novasMetas,
       ultima_revisao: mesAtual(),
       revisao_em_andamento: null,
@@ -561,7 +664,8 @@ function SessaoGuiada({ data, up, rendaTotal, vencendoBreve, alocacaoReal, patri
 
   const PASSOS = ["Início", "Posições", "Vencimentos", "Metas", "Resumo"];
   const metasAtivas = data.metas.filter(m => (m.aportes || []).reduce((s, a) => s + a.valor, 0) < m.valor_alvo);
-  const patrimSimulado = data.posicoes.reduce((s, p) => s + (valoresPosicoes[p.id] ?? p.valor), 0);
+  const patrimSimulado = data.posicoes.reduce((s, p) => s + (valoresPosicoes[p.id] ?? p.valor), 0)
+    + (data.bens || []).reduce((s, b) => s + (valoresBens[b.id] ?? b.valor), 0);
 
   return (
     <div style={{ minHeight: "100vh", background: "#080d18", fontFamily: "'Syne', sans-serif", color: "#e2e8f0" }}>
@@ -668,6 +772,32 @@ function SessaoGuiada({ data, up, rendaTotal, vencendoBreve, alocacaoReal, patri
                 </div>
               );
             })}
+            {(data.bens || []).length > 0 && (
+              <div style={{ background: "#0f172a", border: "1px solid #1e293b", borderRadius: 14, overflow: "hidden" }}>
+                <div style={{ padding: "12px 16px", borderBottom: "1px solid #1e293b", display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ fontSize: 18 }}>◆</span>
+                  <span style={{ fontWeight: 600, fontSize: 14 }}>Bens e Imóveis</span>
+                  <span style={{ fontSize: 12, color: "#334155" }}>· {(data.bens || []).length} item{(data.bens || []).length !== 1 ? "s" : ""}</span>
+                </div>
+                {(data.bens || []).map(b => (
+                  <div key={b.id} style={{ padding: "10px 16px", borderBottom: "1px solid #0f172a", display: "flex", alignItems: "center", gap: 12 }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 13, fontWeight: 500 }}>{b.produto}</div>
+                      <div style={{ fontSize: 11, color: "#334155" }}>{b.tipo === "imovel" ? "Imóvel" : "Bem"} · {b.liquidez}</div>
+                    </div>
+                    <div style={{ textAlign: "right", minWidth: 140 }}>
+                      <div style={{ fontSize: 10, color: "#475569", marginBottom: 3 }}>Valor atual (R$)</div>
+                      <input
+                        type="number"
+                        value={valoresBens[b.id] ?? b.valor}
+                        onChange={e => setValoresBens(v => ({ ...v, [b.id]: +e.target.value }))}
+                        style={{ ...IS, width: 140, padding: "5px 8px", textAlign: "right", fontFamily: "JetBrains Mono" }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
             <div style={{ display: "flex", justifyContent: "space-between" }}>
               <Btn ghost label="← Voltar" onClick={() => setPasso(0)} />
               <Btn accent label="Continuar →" onClick={() => setPasso(2)} />
@@ -782,10 +912,10 @@ function SessaoGuiada({ data, up, rendaTotal, vencendoBreve, alocacaoReal, patri
 
         {/* PASSO 4 — RESUMO */}
         {passo === 4 && (() => {
-          const novoPatrimLP = data.posicoes.filter(p => p.balde === "Longo Prazo").reduce((s, p) => s + (valoresPosicoes[p.id] ?? p.valor), 0);
+          const novoPatrimInv = data.posicoes.filter(p => BALDES_INV.includes(p.balde)).reduce((s, p) => s + (valoresPosicoes[p.id] ?? p.valor), 0);
           const alocSimulada = CLASSES.map(c => {
-            const val = data.posicoes.filter(p => p.balde === "Longo Prazo" && p.classe === c).reduce((s, p) => s + (valoresPosicoes[p.id] ?? p.valor), 0);
-            return { classe: c, valor: val, pct: novoPatrimLP > 0 ? (val / novoPatrimLP) * 100 : 0 };
+            const val = data.posicoes.filter(p => BALDES_INV.includes(p.balde) && p.classe === c).reduce((s, p) => s + (valoresPosicoes[p.id] ?? p.valor), 0);
+            return { classe: c, valor: val, pct: novoPatrimInv > 0 ? (val / novoPatrimInv) * 100 : 0 };
           }).filter(a => a.valor > 0);
           const desvios = data.alocacao_alvo.map(alvo => {
             const real = alocSimulada.find(a => a.classe === alvo.classe);
@@ -807,8 +937,8 @@ function SessaoGuiada({ data, up, rendaTotal, vencendoBreve, alocacaoReal, patri
                 <div style={{ background: "#0f172a", border: "1px solid #1e293b", borderRadius: 12, padding: 14 }}>
                   <div style={{ fontSize: 10, color: "#475569", textTransform: "uppercase", marginBottom: 4 }}>Patrimônio atualizado</div>
                   <div style={{ fontFamily: "JetBrains Mono", fontSize: 20, color: "#4ade80" }}>{fmt(patrimSimulado)}</div>
-                  <div style={{ fontSize: 11, color: patrimSimulado >= data.posicoes.reduce((s,p)=>s+p.valor,0) ? "#4ade80" : "#f87171", marginTop: 4 }}>
-                    {patrimSimulado >= data.posicoes.reduce((s,p)=>s+p.valor,0) ? "▲" : "▼"} {fmt(Math.abs(patrimSimulado - data.posicoes.reduce((s,p)=>s+p.valor,0)))} vs. anterior
+                  <div style={{ fontSize: 11, color: patrimSimulado >= (data.posicoes.reduce((s,p)=>s+p.valor,0) + (data.bens||[]).reduce((s,b)=>s+b.valor,0)) ? "#4ade80" : "#f87171", marginTop: 4 }}>
+                    {patrimSimulado >= (data.posicoes.reduce((s,p)=>s+p.valor,0) + (data.bens||[]).reduce((s,b)=>s+b.valor,0)) ? "▲" : "▼"} {fmt(Math.abs(patrimSimulado - (data.posicoes.reduce((s,p)=>s+p.valor,0) + (data.bens||[]).reduce((s,b)=>s+b.valor,0))))} vs. anterior
                   </div>
                 </div>
                 <div style={{ background: "#0f172a", border: "1px solid #1e293b", borderRadius: 12, padding: 14 }}>
@@ -819,7 +949,7 @@ function SessaoGuiada({ data, up, rendaTotal, vencendoBreve, alocacaoReal, patri
               </div>
 
               {/* Alocação resumo */}
-              <Card title="Alocação — Longo Prazo">
+              <Card title="Alocação — Investimentos">
                 {data.alocacao_alvo.map(alvo => {
                   const real = alocSimulada.find(a => a.classe === alvo.classe);
                   const realPct = real ? real.pct : 0;
@@ -863,7 +993,7 @@ function SessaoGuiada({ data, up, rendaTotal, vencendoBreve, alocacaoReal, patri
 // ===============================================================================
 // DASHBOARD
 // ===============================================================================
-function Dashboard({ data, up, patrimTotal, patrimoLP, patrimoRE, patrimoMetas, alocacaoReal, vencendoBreve, rendaTotal, onIniciarRevisao, exibir }) {
+function Dashboard({ data, up, patrimTotal, patrimBens, patrimoInv, patrimoCP, patrimoMP, patrimoLP, patrimoRE, patrimoMetas, alocacaoReal, vencendoBreve, rendaTotal, onIniciarRevisao, exibir }) {
   const cfg = data.config;
   const investMensal = rendaTotal * (cfg.taxa_investimento / 100);
   const reservaAlvo = rendaTotal * cfg.reserva_emergencia_meses;
@@ -875,9 +1005,10 @@ function Dashboard({ data, up, patrimTotal, patrimoLP, patrimoRE, patrimoMetas, 
     return { ...alvo, realPct, fora: Math.abs(realPct - alvo.alvo) > alvo.banda };
   }).filter(d => d.fora);
   const baldeSlices = [
-    { pct: patrimTotal > 0 ? (patrimoLP / patrimTotal) * 100 : 0, color: "#4ade80" },
+    { pct: patrimTotal > 0 ? (patrimoInv / patrimTotal) * 100 : 0, color: "#4ade80" },
     { pct: patrimTotal > 0 ? (patrimoRE / patrimTotal) * 100 : 0, color: "#60a5fa" },
     { pct: patrimTotal > 0 ? (patrimoMetas / patrimTotal) * 100 : 0, color: "#fb923c" },
+    { pct: patrimTotal > 0 ? (patrimBens / patrimTotal) * 100 : 0, color: COLOR_BENS_IMOVEIS },
   ];
 
   return (
@@ -898,12 +1029,21 @@ function Dashboard({ data, up, patrimTotal, patrimoLP, patrimoRE, patrimoMetas, 
         </div>
       )}
 
-      {/* KPIs */}
+      {/* Patrimônio total — largura total, mais compacto */}
+      <div style={{ background: "#0f172a", border: "1px solid #1e293b", borderRadius: 12, padding: "12px 16px" }}>
+        <div style={{ fontSize: 10, color: "#334155", textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 4 }}>Patrimônio total</div>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", flexWrap: "wrap", gap: 8 }}>
+          <div style={{ fontFamily: "JetBrains Mono", fontSize: 22, fontWeight: 600, color: "#4ade80" }}>{exibir(patrimTotal)}</div>
+          <div style={{ fontSize: 12, color: "#64748b" }}>Meta: {pct(progMeta)}</div>
+        </div>
+      </div>
+
+      {/* KPIs — ordem: Investimentos, Reserva, Bens, Renda */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(155px,1fr))", gap: 10 }}>
         {[
-          { label: "Patrimônio Total", val: exibir(patrimTotal), sub: `Meta: ${pct(progMeta)}`, c: "#4ade80" },
-          { label: "Longo Prazo", val: exibir(patrimoLP), sub: `${pct(patrimTotal > 0 ? patrimoLP/patrimTotal*100 : 0)} do total`, c: "#4ade80" },
+          { label: "Investimentos", val: exibir(patrimoInv), sub: `${pct(patrimTotal > 0 ? patrimoInv/patrimTotal*100 : 0)} do total`, c: "#4ade80" },
           { label: "Reserva", val: exibir(patrimoRE), sub: `Alvo ${exibir(reservaAlvo)}`, c: patrimoRE >= reservaAlvo ? "#4ade80" : "#f59e0b" },
+          { label: "Bens e Imóveis", val: exibir(patrimBens), sub: `${pct(patrimTotal > 0 ? patrimBens/patrimTotal*100 : 0)} do total`, c: COLOR_BENS_IMOVEIS },
           { label: "Renda Mensal", val: exibir(rendaTotal), sub: `${data.fontes_renda.length} fonte${data.fontes_renda.length !== 1 ? "s" : ""}`, c: "#a78bfa" },
         ].map((k, i) => (
           <div key={i} style={{ background: "#0f172a", border: "1px solid #1e293b", borderRadius: 12, padding: 14 }}>
@@ -920,7 +1060,7 @@ function Dashboard({ data, up, patrimTotal, patrimoLP, patrimoRE, patrimoMetas, 
           <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
             <div style={{ flexShrink: 0, minWidth: 110 }}><Donut slices={baldeSlices} size={110} /></div>
             <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 8 }}>
-              {[["Longo Prazo", patrimoLP, "#4ade80"], ["Reserva", patrimoRE, "#60a5fa"], ["Metas", patrimoMetas, "#fb923c"]].map(([l, v, c]) => (
+              {[["Investimentos", patrimoInv, "#4ade80"], ["Reserva", patrimoRE, "#60a5fa"], ["Metas", patrimoMetas, "#fb923c"], ["Bens e Imóveis", patrimBens, COLOR_BENS_IMOVEIS]].map(([l, v, c]) => (
                 <div key={l}>
                   <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, marginBottom: 3 }}>
                     <span style={{ color: c }}>{l}</span>
@@ -929,10 +1069,13 @@ function Dashboard({ data, up, patrimTotal, patrimoLP, patrimoRE, patrimoMetas, 
                   <ProgressBar value={v} max={patrimTotal} color={c} height={4} />
                 </div>
               ))}
+              <div style={{ fontSize: 11, color: "#334155", marginTop: 2 }}>
+                Curto {exibir(patrimoCP)} · Médio {exibir(patrimoMP)} · Longo {exibir(patrimoLP)}
+              </div>
             </div>
           </div>
         </Card>
-        <Card title="Alocação LP">
+        <Card title="Alocação (Investimentos)">
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <div style={{ flexShrink: 0, minWidth: 110 }}><Donut
               slices={alocacaoReal.length > 0
@@ -995,6 +1138,201 @@ function Dashboard({ data, up, patrimTotal, patrimoLP, patrimoRE, patrimoMetas, 
 }
 
 // ===============================================================================
+// BENS E IMÓVEIS
+// ===============================================================================
+function BensImoveis({ data, up, exibir }) {
+  const [editId, setEditId] = useState(null);
+  const [expandHist, setExpandHist] = useState({});
+  const bens = data.bens || [];
+
+  function saveBem(b) {
+    const prev = b.id ? bens.find(x => x.id === b.id) : null;
+    const mes = b.ultima_atualizacao || mesAtual();
+    let historico_valor = prev?.historico_valor || [];
+    if (!prev) {
+      historico_valor = appendHistoricoValor([], mes, b.valor, MESES_RET_HIST_BENS);
+    } else if (b.valor !== prev.valor) {
+      historico_valor = appendHistoricoValor(historico_valor, mes, b.valor, MESES_RET_HIST_BENS);
+    }
+    const merged = { ...b, historico_valor };
+    if (merged.id && bens.find(x => x.id === merged.id)) {
+      up("bens", bens.map(x => x.id === merged.id ? merged : x));
+    } else {
+      up("bens", [...bens, { ...merged, id: Date.now() }]);
+    }
+    setEditId(null);
+  }
+  function delBem(id) { up("bens", bens.filter(b => b.id !== id)); }
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div>
+          <div style={{ fontWeight: 700, fontSize: 16 }}>Bens e Imóveis</div>
+          <div style={{ fontSize: 12, color: "#475569", marginTop: 2 }}>Patrimônio físico · fora da alocação de investimentos · atualização sugerida anual</div>
+        </div>
+        <Btn label="+ Bem" onClick={() => setEditId("new")} />
+      </div>
+
+      {editId === "new" && (
+        <BemForm
+          bem={{ tipo: "bem", produto: "", valor: 0, liquidez: LIQUIDEZ[0], ultima_atualizacao: mesAtual() }}
+          onSave={saveBem} onCancel={() => setEditId(null)}
+        />
+      )}
+
+      {bens.length === 0 && editId !== "new" && (
+        <div style={{ textAlign: "center", padding: 40, color: "#334155", fontSize: 13 }}>Nenhum bem cadastrado.</div>
+      )}
+
+      {bens.map(bem => {
+        const atraso = mesesDesde(bem.ultima_atualizacao);
+        const r5 = rendimentoHistorico(bem.valor, bem.historico_valor, MESES_REND_BENS);
+        const exp = expandHist[bem.id];
+        const hist = [...(bem.historico_valor || [])].sort((a, x) => x.mes.localeCompare(a.mes));
+        return editId === bem.id ? (
+          <BemForm key={bem.id} bem={bem} onSave={saveBem} onCancel={() => setEditId(null)} />
+        ) : (
+          <div key={bem.id} style={{ background: "#0f172a", border: "1px solid #1e293b", borderRadius: 14, padding: 14 }}>
+            <div style={{ display: "flex", alignItems: "flex-start", gap: 12, flexWrap: "wrap" }}>
+              <div style={{ flex: 1, minWidth: 160 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                  <span style={{ fontSize: 15, fontWeight: 600 }}>{bem.produto}</span>
+                  <Tag label={bem.tipo === "imovel" ? "Imóvel" : "Bem"} color={COLOR_BENS_IMOVEIS} />
+                  {atraso > ALERTA_BENS_MESES && (
+                    <span style={{ background: "#1c1408", border: "1px solid #713f12", color: "#f59e0b", borderRadius: 5, padding: "1px 5px", fontSize: 10 }}>{atraso}m sem atualizar</span>
+                  )}
+                </div>
+                <div style={{ fontSize: 11, color: "#475569" }}>{bem.liquidez} · atual. {bem.ultima_atualizacao || "—"}</div>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                <div style={{ textAlign: "right" }}>
+                  <div style={{ fontSize: 10, color: "#64748b" }}>5 anos</div>
+                  <div style={{ fontFamily: "JetBrains Mono", fontSize: 13, color: r5 != null ? (r5 >= 0 ? "#4ade80" : "#f87171") : "#334155" }}>{r5 != null ? pct(r5) : "—"}</div>
+                </div>
+                <div style={{ textAlign: "right" }}>
+                  <div style={{ fontFamily: "JetBrains Mono", fontSize: 16, color: "#e2e8f0" }}>{exibir(bem.valor)}</div>
+                </div>
+                <div style={{ display: "flex", gap: 4 }}>
+                  <button type="button" onClick={() => setEditId(bem.id)} style={{ background: "none", border: "none", color: "#334155", cursor: "pointer" }}>✎</button>
+                  <button type="button" onClick={() => delBem(bem.id)} style={{ background: "none", border: "none", color: "#334155", cursor: "pointer" }}>✕</button>
+                </div>
+              </div>
+            </div>
+            {hist.length > 0 && (
+              <div style={{ marginTop: 10, borderTop: "1px solid #0f172a", paddingTop: 8 }}>
+                <button type="button" onClick={() => setExpandHist(e => ({ ...e, [bem.id]: !e[bem.id] }))} style={{ background: "none", border: "none", color: "#475569", cursor: "pointer", fontSize: 11, fontFamily: "Syne" }}>
+                  {exp ? "▼" : "▶"} Histórico de valores ({hist.length})
+                </button>
+                {exp && (
+                  <div style={{ marginTop: 8, fontSize: 11, color: "#94a3b8", display: "flex", flexDirection: "column", gap: 4 }}>
+                    {hist.map(h => (
+                      <div key={h.mes} style={{ display: "flex", justifyContent: "space-between" }}>
+                        <span>{h.mes}</span>
+                        <span style={{ fontFamily: "JetBrains Mono" }}>{exibir(h.valor)}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function BemForm({ bem, onSave, onCancel }) {
+  const [f, setF] = useState({ ...bem });
+  const u = (k, v) => setF(p => ({ ...p, [k]: v }));
+  return (
+    <div style={{ background: "#0a1628", border: "1px solid #1e3a5f", borderRadius: 12, padding: 14, marginBottom: 10, display: "flex", flexDirection: "column", gap: 10 }}>
+      <div style={{ fontSize: 12, color: "#c084fc", fontWeight: 600 }}>{f.id ? "Editar" : "Novo"} bem</div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+        <Field label="Tipo">
+          <select value={f.tipo} onChange={e => u("tipo", e.target.value)} style={IS}>
+            <option value="bem">Bem</option>
+            <option value="imovel">Imóvel</option>
+          </select>
+        </Field>
+        <Input label="Produto" value={f.produto} onChange={v => u("produto", v)} placeholder="Ex: Casa na Praia" />
+        <Input label="Valor atual estimado (R$)" type="number" value={f.valor} onChange={v => u("valor", +v)} />
+        <Select label="Liquidez" value={f.liquidez} onChange={v => u("liquidez", v)} options={LIQUIDEZ} />
+        <Input label="Última atualização" type="month" value={f.ultima_atualizacao} onChange={v => u("ultima_atualizacao", v)} />
+      </div>
+      <div style={{ display: "flex", gap: 8 }}>
+        <Btn label="Salvar" onClick={() => onSave(f)} disabled={!f.produto || !f.valor} />
+        <Btn label="Cancelar" danger onClick={onCancel} />
+      </div>
+    </div>
+  );
+}
+
+function LinhaPosicao({ pos, totalGeral, exibir, onEdit, onDelete, periodoMeses, onPeriodo }) {
+  const [expandHist, setExpandHist] = useState(false);
+  const atraso = mesesDesde(pos.ultima_atualizacao);
+  const venc = pos.vencimento ? mesesAte(pos.vencimento) : null;
+  const r = rendimentoHistorico(pos.valor, pos.historico_valor, periodoMeses);
+  const hist = [...(pos.historico_valor || [])].sort((a, b) => b.mes.localeCompare(a.mes));
+  return (
+    <div style={{ padding: "10px 0", borderBottom: "1px solid #0a0f1a" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+        <div style={{ flex: 1, minWidth: 140 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+            <span style={{ fontSize: 13, fontWeight: 500 }}>{pos.produto}</span>
+            {atraso > 1 && <span style={{ background: "#1c1408", border: "1px solid #713f12", color: "#f59e0b", borderRadius: 5, padding: "1px 5px", fontSize: 10 }}>{atraso}m sem atualizar</span>}
+          </div>
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+            <Tag label={pos.classe} color={CLASS_COLORS[pos.classe] || "#94a3b8"} />
+            <Tag label={pos.balde} color={BALDE_COLORS[pos.balde] || "#fb923c"} />
+            <Tag label={pos.liquidez} color="#475569" />
+            {pos.vencimento && <Tag label={`vence ${pos.vencimento}${venc !== null ? ` (${venc < 0 ? "vencido" : venc + "m"})` : ""}`} color={venc !== null && venc <= 2 ? "#f59e0b" : "#334155"} />}
+          </div>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+          <select value={String(periodoMeses)} onChange={e => onPeriodo(+e.target.value)} style={{ ...IS, width: "auto", padding: "4px 8px", fontSize: 11 }}>
+            <option value="1">1 m</option>
+            <option value="3">3 m</option>
+            <option value="6">6 m</option>
+            <option value="12">12 m</option>
+          </select>
+          <div style={{ textAlign: "right", minWidth: 56 }}>
+            <div style={{ fontSize: 10, color: "#64748b" }}>Rend.</div>
+            <div style={{ fontFamily: "JetBrains Mono", fontSize: 12, color: r != null ? (r >= 0 ? "#4ade80" : "#f87171") : "#334155" }}>{r != null ? pct(r) : "—"}</div>
+          </div>
+          <div style={{ textAlign: "right" }}>
+            <div style={{ fontFamily: "JetBrains Mono", fontSize: 14 }}>{exibir(pos.valor)}</div>
+            <div style={{ fontSize: 10, color: "#334155" }}>{pct(totalGeral > 0 ? pos.valor / totalGeral * 100 : 0)}</div>
+          </div>
+          <div style={{ display: "flex", gap: 4 }}>
+            <button type="button" onClick={onEdit} style={{ background: "none", border: "none", color: "#334155", cursor: "pointer" }}>✎</button>
+            <button type="button" onClick={onDelete} style={{ background: "none", border: "none", color: "#334155", cursor: "pointer" }}>✕</button>
+          </div>
+        </div>
+      </div>
+      {hist.length > 0 && (
+        <div style={{ marginTop: 8 }}>
+          <button type="button" onClick={() => setExpandHist(e => !e)} style={{ background: "none", border: "none", color: "#475569", cursor: "pointer", fontSize: 11, fontFamily: "Syne" }}>
+            {expandHist ? "▼" : "▶"} Histórico de valores ({hist.length})
+          </button>
+          {expandHist && (
+            <div style={{ marginTop: 6, fontSize: 11, color: "#94a3b8", display: "flex", flexDirection: "column", gap: 3 }}>
+              {hist.map(h => (
+                <div key={h.mes} style={{ display: "flex", justifyContent: "space-between" }}>
+                  <span>{h.mes}</span>
+                  <span style={{ fontFamily: "JetBrains Mono" }}>{exibir(h.valor)}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ===============================================================================
 // POSIÇÕES
 // ===============================================================================
 function Posicoes({ data, up, exibir }) {
@@ -1002,13 +1340,23 @@ function Posicoes({ data, up, exibir }) {
   const [novaInstForm, setNovaInstForm] = useState(false);
   const [instForm, setInstForm] = useState({ nome: "", icon: "🏦" });
   const [expandInst, setExpandInst] = useState({});
+  const [rendPeriod, setRendPeriod] = useState({});
   const totalGeral = data.posicoes.reduce((s, p) => s + p.valor, 0);
 
   function savePosicao(pos) {
-    if (pos.id && data.posicoes.find(p => p.id === pos.id)) {
-      up("posicoes", data.posicoes.map(p => p.id === pos.id ? pos : p));
+    const prev = pos.id ? data.posicoes.find(p => p.id === pos.id) : null;
+    const mes = pos.ultima_atualizacao || mesAtual();
+    let historico_valor = prev?.historico_valor || [];
+    if (!prev) {
+      historico_valor = appendHistoricoValor([], mes, pos.valor, MESES_RET_HIST_POSICOES);
+    } else if (pos.valor !== prev.valor) {
+      historico_valor = appendHistoricoValor(historico_valor, mes, pos.valor, MESES_RET_HIST_POSICOES);
+    }
+    const merged = { ...pos, historico_valor };
+    if (merged.id && data.posicoes.find(p => p.id === merged.id)) {
+      up("posicoes", data.posicoes.map(p => p.id === merged.id ? merged : p));
     } else {
-      up("posicoes", [...data.posicoes, { ...pos, id: Date.now() }]);
+      up("posicoes", [...data.posicoes, { ...merged, id: Date.now() }]);
     }
     setEditId(null);
   }
@@ -1051,7 +1399,7 @@ function Posicoes({ data, up, exibir }) {
 
       {editId === "new" && (
         <PosicaoForm
-          pos={{ inst_id: data.instituicoes[0]?.id, produto: "", classe: CLASSES[0], balde: "Longo Prazo", valor: 0, liquidez: LIQUIDEZ[0], vencimento: "", ultima_atualizacao: mesAtual() }}
+          pos={{ inst_id: data.instituicoes[0]?.id, produto: "", classe: CLASSES[0], indexacao: "", balde: "Longo Prazo", valor: 0, liquidez: LIQUIDEZ[0], vencimento: "", ultima_atualizacao: mesAtual() }}
           instituicoes={data.instituicoes} metas={data.metas}
           onSave={savePosicao} onCancel={() => setEditId(null)}
         />
@@ -1075,36 +1423,22 @@ function Posicoes({ data, up, exibir }) {
             </div>
             {expanded && (
               <div style={{ padding: "0 16px 12px" }}>
-                {posList.map(pos => {
-                  const atraso = mesesDesde(pos.ultima_atualizacao);
-                  const venc = pos.vencimento ? mesesAte(pos.vencimento) : null;
-                  return editId === pos.id ? (
+                {posList.map(pos => (
+                  editId === pos.id ? (
                     <PosicaoForm key={pos.id} pos={pos} instituicoes={data.instituicoes} metas={data.metas} onSave={savePosicao} onCancel={() => setEditId(null)} />
                   ) : (
-                    <div key={pos.id} style={{ padding: "10px 0", borderBottom: "1px solid #0a0f1a", display: "flex", alignItems: "center", gap: 10 }}>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
-                          <span style={{ fontSize: 13, fontWeight: 500 }}>{pos.produto}</span>
-                          {atraso > 1 && <span style={{ background: "#1c1408", border: "1px solid #713f12", color: "#f59e0b", borderRadius: 5, padding: "1px 5px", fontSize: 10 }}>{atraso}m sem atualizar</span>}
-                        </div>
-                        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                          <Tag label={pos.classe} color={CLASS_COLORS[pos.classe] || "#94a3b8"} />
-                          <Tag label={pos.balde} color={BALDE_COLORS[pos.balde] || "#fb923c"} />
-                          <Tag label={pos.liquidez} color="#475569" />
-                          {pos.vencimento && <Tag label={`vence ${pos.vencimento}${venc !== null ? ` (${venc < 0 ? "vencido" : venc + "m"})` : ""}`} color={venc !== null && venc <= 2 ? "#f59e0b" : "#334155"} />}
-                        </div>
-                      </div>
-                      <div style={{ textAlign: "right" }}>
-                        <div style={{ fontFamily: "JetBrains Mono", fontSize: 14 }}>{exibir(pos.valor)}</div>
-                        <div style={{ fontSize: 10, color: "#334155" }}>{pct(totalGeral > 0 ? pos.valor / totalGeral * 100 : 0)}</div>
-                      </div>
-                      <div style={{ display: "flex", gap: 4 }}>
-                        <button onClick={() => setEditId(pos.id)} style={{ background: "none", border: "none", color: "#334155", cursor: "pointer" }}>✎</button>
-                        <button onClick={() => delPosicao(pos.id)} style={{ background: "none", border: "none", color: "#334155", cursor: "pointer" }}>✕</button>
-                      </div>
-                    </div>
-                  );
-                })}
+                    <LinhaPosicao
+                      key={pos.id}
+                      pos={pos}
+                      totalGeral={totalGeral}
+                      exibir={exibir}
+                      periodoMeses={rendPeriod[pos.id] ?? 1}
+                      onPeriodo={(n) => setRendPeriod(r => ({ ...r, [pos.id]: n }))}
+                      onEdit={() => setEditId(pos.id)}
+                      onDelete={() => delPosicao(pos.id)}
+                    />
+                  )
+                ))}
                 <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
                   <Btn small ghost label="+ Produto" onClick={() => setEditId("new")} />
                   <Btn small danger label="Remover instituição" onClick={() => delInst(inst.id)} />
@@ -1132,8 +1466,11 @@ function PosicaoForm({ pos, instituicoes, metas, onSave, onCancel }) {
         </Field>
         <Input label="Produto" value={f.produto} onChange={v => up("produto", v)} placeholder="Ex: CDB 13% a.a." />
         <Select label="Classe" value={f.classe} onChange={v => up("classe", v)} options={CLASSES} />
+        <Select label="Indexação" value={f.indexacao ?? ""} onChange={v => up("indexacao", v)} options={INDEXACAO} />
         <Field label="Balde">
           <select value={f.balde} onChange={e => up("balde", e.target.value)} style={IS}>
+            <option>Curto Prazo</option>
+            <option>Médio Prazo</option>
             <option>Longo Prazo</option>
             <option>Reserva de Emergência</option>
             {metas.map(m => <option key={m.id} value={`Meta: ${m.nome}`}>{m.icon} Meta: {m.nome}</option>)}
@@ -1155,8 +1492,9 @@ function PosicaoForm({ pos, instituicoes, metas, onSave, onCancel }) {
 // ===============================================================================
 // ALOCAÇÃO
 // ===============================================================================
-function Alocacao({ data, up, alocacaoReal, patrimoLP, exibir }) {
+function Alocacao({ data, up, alocacaoReal, patrimoInv, exibir }) {
   const [editId, setEditId] = useState(null);
+  const [visao, setVisao] = useState("produto"); // produto | indexacao | horizonte
   const totalAlvo = data.alocacao_alvo.reduce((s, a) => s + a.alvo, 0);
   function updateAlvo(id, k, v) { up("alocacao_alvo", data.alocacao_alvo.map(a => a.id === id ? { ...a, [k]: v } : a)); }
   function delAlvo(id) { up("alocacao_alvo", data.alocacao_alvo.filter(a => a.id !== id)); }
@@ -1165,12 +1503,47 @@ function Alocacao({ data, up, alocacaoReal, patrimoLP, exibir }) {
     up("alocacao_alvo", [...data.alocacao_alvo, { id, classe: CLASSES[0], alvo: 0, banda: 5 }]);
     setEditId(id);
   }
+
+  const posInv = data.posicoes.filter(p => BALDES_INV.includes(p.balde));
+  const somaBy = (keyFn) => {
+    const m = new Map();
+    posInv.forEach(p => {
+      const k = keyFn(p) || "Não classificado";
+      m.set(k, (m.get(k) || 0) + (p.valor || 0));
+    });
+    const out = Array.from(m.entries()).map(([k, v]) => ({ k, v, pct: patrimoInv > 0 ? (v / patrimoInv) * 100 : 0 }));
+    out.sort((a, b) => b.v - a.v);
+    return out;
+  };
+
+  const produtoBucket = (p) => {
+    const prod = String(p.produto || "");
+    const classe = String(p.classe || "");
+    if (classe === "Renda Fixa") {
+      if (/(CDB|LCI|LCA)/i.test(prod)) return "Renda Fixa — CDB/LCI/LCA";
+      if (/(IPCA|Deb[eê]ntur|Debenture|CRI|CRA)/i.test(prod)) return "Renda Fixa — IPCA+/Debêntures";
+      if (/Tesouro/i.test(prod)) return "Renda Fixa — Tesouro";
+      return "Renda Fixa — Outros";
+    }
+    if (classe === "Fundos / ETFs") return "Fundos";
+    if (classe === "Ações") return "Ações";
+    if (classe === "FIIs") return "FIIs";
+    if (classe === "Internacional" || /(BDR|IVVB11|ACWI|VT|VOO|SPY)/i.test(prod)) return "Internacional";
+    if (classe === "Cripto") return "Criptoativos";
+    return classe || "Outro";
+  };
+
+  const visaoRows =
+    visao === "indexacao" ? somaBy(p => p.indexacao) :
+    visao === "horizonte" ? somaBy(p => p.balde) :
+    somaBy(p => produtoBucket(p));
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div>
           <div style={{ fontWeight: 700, fontSize: 16 }}>Política de Alocação</div>
-          <div style={{ fontSize: 12, color: "#475569", marginTop: 2 }}>Governa apenas o balde Longo Prazo · calculada automaticamente</div>
+          <div style={{ fontSize: 12, color: "#475569", marginTop: 2 }}>Governa Curto/Médio/Longo Prazo · metas e reserva ficam fora</div>
         </div>
         <div style={{ fontFamily: "JetBrains Mono", fontSize: 18, color: totalAlvo === 100 ? "#4ade80" : "#f59e0b" }}>{totalAlvo}%</div>
       </div>
@@ -1195,14 +1568,14 @@ function Alocacao({ data, up, alocacaoReal, patrimoLP, exibir }) {
             </div>
           </div>
         </Card>
-        <Card title="Alocação Real (LP)">
+        <Card title="Alocação Real (Investimentos)">
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <Donut
               slices={alocacaoReal.length > 0
                 ? alocacaoReal.map(a => ({ pct: a.pct, color: CLASS_COLORS[a.classe] || "#94a3b8" }))
                 : [{ pct: 100, color: "#1e293b" }]
               }
-              size={110} label="Real" sublabel={exibir(patrimoLP).replace("R$", "")}
+              size={110} label="Real" sublabel={exibir(patrimoInv).replace("R$", "")}
             />
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
               {alocacaoReal.length > 0 ? alocacaoReal.map(a => (
@@ -1211,11 +1584,41 @@ function Alocacao({ data, up, alocacaoReal, patrimoLP, exibir }) {
                   <span style={{ color: "#94a3b8" }}>{a.classe}</span>
                   <span style={{ fontFamily: "JetBrains Mono", color: CLASS_COLORS[a.classe] || "#94a3b8", marginLeft: "auto" }}>{pct(a.pct)}</span>
                 </div>
-              )) : <span style={{ fontSize: 11, color: "#334155" }}>Sem posições LP</span>}
+              )) : <span style={{ fontSize: 11, color: "#334155" }}>Sem posições de investimento</span>}
             </div>
           </div>
         </Card>
       </div>
+
+      <Card title="Visões de Carteira (Investimentos)">
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          {[
+            ["produto", "Produto"],
+            ["indexacao", "Indexação (pós/inflação/pré)"],
+            ["horizonte", "Horizonte (curto/médio/longo)"],
+          ].map(([id, label]) => (
+            <button key={id} onClick={() => setVisao(id)} style={{
+              background: visao === id ? "#0f172a" : "transparent",
+              border: `1px solid ${visao === id ? "#1e293b" : "#0b1120"}`,
+              color: visao === id ? "#4ade80" : "#334155",
+              borderRadius: 10, padding: "6px 10px", fontSize: 12,
+              fontFamily: "Syne", cursor: "pointer",
+            }}>{label}</button>
+          ))}
+        </div>
+        <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 8 }}>
+          {visaoRows.length > 0 ? visaoRows.map(r => (
+            <div key={r.k}>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, marginBottom: 3 }}>
+                <span style={{ color: "#94a3b8" }}>{r.k}</span>
+                <span style={{ fontFamily: "JetBrains Mono", color: "#475569" }}>{pct(r.pct)} <span style={{ color: "#334155" }}>· {exibir(r.v)}</span></span>
+              </div>
+              <ProgressBar value={r.v} max={patrimoInv || 1} color="#4ade80" height={4} />
+            </div>
+          )) : <div style={{ fontSize: 12, color: "#334155" }}>Sem posições de investimento.</div>}
+        </div>
+      </Card>
+
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         {data.alocacao_alvo.map(alvo => {
           const real = alocacaoReal.find(a => a.classe === alvo.classe);
@@ -1256,7 +1659,7 @@ function Alocacao({ data, up, alocacaoReal, patrimoLP, exibir }) {
                     <div style={{ position: "absolute", left: 0, top: 0, height: "100%", width: `${Math.min(100, realPct)}%`, background: fora ? "#3b82f6" : color, borderRadius: 99 }} />
                     <div style={{ position: "absolute", top: -2, left: `${Math.min(100, alvo.alvo)}%`, width: 2, height: 10, background: "#ffffff30" }} />
                   </div>
-                  <div style={{ fontSize: 10, color: "#334155", marginTop: 4 }}>banda ±{alvo.banda}% · {exibir(real?.valor || 0)} em LP</div>
+                  <div style={{ fontSize: 10, color: "#334155", marginTop: 4 }}>banda ±{alvo.banda}% · {exibir(real?.valor || 0)} em investimentos</div>
                 </div>
               )}
             </div>
@@ -1275,6 +1678,7 @@ function Metas({ data, up, exibir }) {
   const [editId, setEditId] = useState(null);
   const [showNew, setShowNew] = useState(false);
   const [aporteForm, setAporteForm] = useState({});
+  const [expandAportes, setExpandAportes] = useState({});
   const CORES = ["#4ade80", "#60a5fa", "#818cf8", "#fb923c", "#f472b6", "#facc15", "#34d399", "#f87171"];
 
   function saveMeta(form) {
@@ -1338,20 +1742,44 @@ function Metas({ data, up, exibir }) {
                 {mesesProj !== null && <span>🎯 ~{mesesProj} meses</span>}
               </div>
               {concluida && <div style={{ background: "#052e16", border: "1px solid #166534", borderRadius: 8, padding: "6px 12px", fontSize: 12, color: "#4ade80", marginBottom: 10 }}>🎉 Meta concluída!</div>}
-              {(m.aportes || []).length > 0 && (
-                <div style={{ marginBottom: 10 }}>
-                  <div style={{ fontSize: 10, color: "#334155", marginBottom: 4, textTransform: "uppercase" }}>Aportes</div>
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                    {[...(m.aportes || [])].sort((a, b) => b.mes.localeCompare(a.mes)).map(a => (
-                      <div key={a.id} style={{ background: "#0a0f1a", border: "1px solid #1e293b", borderRadius: 6, padding: "3px 8px", fontSize: 11, display: "flex", gap: 6, alignItems: "center" }}>
-                        <span style={{ color: "#475569" }}>{a.mes}</span>
-                        <span style={{ color: "#94a3b8", fontFamily: "JetBrains Mono" }}>{exibir(a.valor)}</span>
-                        <button onClick={() => delAporte(m.id, a.id)} style={{ background: "none", border: "none", color: "#334155", cursor: "pointer", fontSize: 10 }}>✕</button>
+              {(m.aportes || []).length > 0 && (() => {
+                const sorted = [...(m.aportes || [])].sort((a, b) => b.mes.localeCompare(a.mes));
+                const vis = sorted.slice(0, 3);
+                const rest = sorted.slice(3);
+                const exp = expandAportes[m.id];
+                return (
+                  <div style={{ marginBottom: 10 }}>
+                    <div style={{ fontSize: 10, color: "#334155", marginBottom: 4, textTransform: "uppercase" }}>Aportes</div>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                      {vis.map(a => (
+                        <div key={a.id} style={{ background: "#0a0f1a", border: "1px solid #1e293b", borderRadius: 6, padding: "3px 8px", fontSize: 11, display: "flex", gap: 6, alignItems: "center" }}>
+                          <span style={{ color: "#475569" }}>{a.mes}</span>
+                          <span style={{ color: "#94a3b8", fontFamily: "JetBrains Mono" }}>{exibir(a.valor)}</span>
+                          <button type="button" onClick={() => delAporte(m.id, a.id)} style={{ background: "none", border: "none", color: "#334155", cursor: "pointer", fontSize: 10 }}>✕</button>
+                        </div>
+                      ))}
+                    </div>
+                    {rest.length > 0 && (
+                      <div style={{ marginTop: 8 }}>
+                        <button type="button" onClick={() => setExpandAportes(x => ({ ...x, [m.id]: !exp }))} style={{ background: "none", border: "none", color: "#475569", cursor: "pointer", fontSize: 11, fontFamily: "Syne" }}>
+                          {exp ? "▼" : "▶"} Ver anteriores ({rest.length})
+                        </button>
+                        {exp && (
+                          <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
+                            {rest.map(a => (
+                              <div key={a.id} style={{ background: "#0a0f1a", border: "1px solid #1e293b", borderRadius: 6, padding: "3px 8px", fontSize: 11, display: "flex", gap: 6, alignItems: "center" }}>
+                                <span style={{ color: "#475569" }}>{a.mes}</span>
+                                <span style={{ color: "#94a3b8", fontFamily: "JetBrains Mono" }}>{exibir(a.valor)}</span>
+                                <button type="button" onClick={() => delAporte(m.id, a.id)} style={{ background: "none", border: "none", color: "#334155", cursor: "pointer", fontSize: 10 }}>✕</button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
-                    ))}
+                    )}
                   </div>
-                </div>
-              )}
+                );
+              })()}
               <div style={{ display: "flex", gap: 8, alignItems: "flex-end", flexWrap: "wrap" }}>
                 <div>
                   <div style={{ fontSize: 10, color: "#475569", marginBottom: 3 }}>Mês</div>
@@ -1692,10 +2120,10 @@ function Config({ data, up, rendaTotal, up_data, exibir }) {
               placeholder="Ex: Atingir independência financeira aos 45 anos…"
               rows={4} style={{ ...IS, resize: "vertical", lineHeight: 1.7 }} />
           </Card>
+          <Card title="Horizonte de Tempo">
+            <input value={ips.horizonte} onChange={e => upI("horizonte", e.target.value)} placeholder="Ex: 15 anos (até 2040)" style={IS} />
+          </Card>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-            <Card title="Horizonte de Tempo">
-              <input value={ips.horizonte} onChange={e => upI("horizonte", e.target.value)} placeholder="Ex: 15 anos (até 2040)" style={IS} />
-            </Card>
             <Card title="Perfil de Risco">
               <select value={ips.tolerancia} onChange={e => upI("tolerancia", e.target.value)} style={IS}>
                 {["Conservador", "Moderado", "Arrojado", "Agressivo"].map(p => <option key={p}>{p}</option>)}
@@ -1704,11 +2132,11 @@ function Config({ data, up, rendaTotal, up_data, exibir }) {
             <Card title="Regra de Rebalanceamento">
               <input value={ips.regra_rebalanceamento} onChange={e => upI("regra_rebalanceamento", e.target.value)} placeholder="Ex: Trimestral ou desvio > 5%" style={IS} />
             </Card>
-            <Card title="Princípios e Restrições">
-              <textarea value={ips.principios} onChange={e => upI("principios", e.target.value)}
-                placeholder="Ex: Não usar alavancagem." rows={2} style={{ ...IS, resize: "vertical" }} />
-            </Card>
           </div>
+          <Card title="Princípios e Restrições">
+            <textarea value={ips.principios} onChange={e => upI("principios", e.target.value)}
+              placeholder="Ex: Não usar alavancagem." rows={4} style={{ ...IS, resize: "vertical", lineHeight: 1.7 }} />
+          </Card>
           <div style={{ background: "#0a1628", border: "1px solid #1e3a5f", borderRadius: 12, padding: 14 }}>
             <div style={{ color: "#38bdf8", fontWeight: 600, fontSize: 12, marginBottom: 8 }}>📋 Checklist Revisão Anual</div>
             {["Revisar objetivo e horizonte", "Atualizar alocação alvo se perfil mudou", "Rebalancear portfólio completo", "Atualizar metas e budgets", "Verificar reserva de emergência"].map((item, i) => (
