@@ -31,14 +31,14 @@ function normalizeData(d) {
 }
 function loadData() {
   try {
-    const r = localStorage.getItem(LS_KEY);
+    const r = sessionStorage.getItem(LS_KEY);
     if (!r) return null;
     const d = JSON.parse(r);
     return normalizeData(d);
   } catch { return null; }
 }
 function saveData(d) {
-  try { localStorage.setItem(LS_KEY, JSON.stringify(d)); } catch {}
+  try { sessionStorage.setItem(LS_KEY, JSON.stringify(d)); } catch {}
 }
 
 // --- Constants ----------------------------------------------------------------
@@ -65,12 +65,12 @@ const DEFAULT = {
   config: {
     taxa_investimento: 25,
     reserva_emergencia_meses: 6,
-    meta_patrimonio: 1000000,
+    meta_patrimonio: 500,
     meta_ano: 2035,
   },
   fontes_renda: [
-    { id: 1, nome: "Salário CLT", valor: 8000, tipo: "Fixo", icon: "💼" },
-    { id: 2, nome: "Freelance", valor: 2000, tipo: "Variável", icon: "💻" },
+    { id: 1, nome: "Salário CLT", valor: 1, tipo: "Fixo", icon: "💼" },
+    { id: 2, nome: "Freelance", valor: 2, tipo: "Variável", icon: "💻" },
   ],
   ips: {
     objetivo: "", horizonte: "", tolerancia: "Moderado",
@@ -87,30 +87,36 @@ const DEFAULT = {
     { id: 3, nome: "Binance", icon: "₿" },
   ],
   posicoes: [
-    { id: 1, inst_id: 1, produto: "CDB 13% a.a.", classe: "Renda Fixa", balde: "Longo Prazo", valor: 25000, liquidez: "No vencimento", vencimento: "2026-06", ultima_atualizacao: "2025-03" },
-    { id: 2, inst_id: 1, produto: "Tesouro Selic 2027", classe: "Renda Fixa", balde: "Reserva de Emergência", valor: 18000, liquidez: "Diária", vencimento: "2027-03", ultima_atualizacao: "2025-03" },
-    { id: 3, inst_id: 2, produto: "BOVA11", classe: "Fundos / ETFs", balde: "Longo Prazo", valor: 12000, liquidez: "Diária", vencimento: "", ultima_atualizacao: "2025-03" },
-    { id: 4, inst_id: 2, produto: "Fundo Multimercado XP", classe: "Fundos / ETFs", balde: "Longo Prazo", valor: 8000, liquidez: "D+30", vencimento: "", ultima_atualizacao: "2025-03" },
-    { id: 5, inst_id: 3, produto: "Bitcoin", classe: "Cripto", balde: "Longo Prazo", valor: 5000, liquidez: "Diária", vencimento: "", ultima_atualizacao: "2025-02" },
+    { id: 1, inst_id: 1, produto: "CDB 13% a.a.", classe: "Renda Fixa", balde: "Longo Prazo", valor: 1, liquidez: "No vencimento", vencimento: "2026-06", ultima_atualizacao: "2024-04", historico_valor: Array.from({length:12}, (_,i) => ({mes: `${2023 + Math.floor((4+i)/12)}-${String((4+i)%12 +1).padStart(2,'0')}`, valor: 1 + 0.02 * i})) },
+    { id: 2, inst_id: 1, produto: "Tesouro Selic 2027", classe: "Renda Fixa", balde: "Reserva de Emergência", valor: 2, liquidez: "Diária", vencimento: "2027-03", ultima_atualizacao: "2024-04", historico_valor: Array.from({length:12}, (_,i) => ({mes: `${2023 + Math.floor((4+i)/12)}-${String((4+i)%12 +1).padStart(2,'0')}`, valor: 2 + 0.02 * i})) },
+    { id: 3, inst_id: 2, produto: "BOVA11", classe: "Fundos / ETFs", balde: "Longo Prazo", valor: 3, liquidez: "Diária", vencimento: "", ultima_atualizacao: "2024-04", historico_valor: Array.from({length:12}, (_,i) => ({mes: `${2023 + Math.floor((4+i)/12)}-${String((4+i)%12 +1).padStart(2,'0')}`, valor: 3 + 0.05 * i})) },
+    { id: 4, inst_id: 2, produto: "Fundo Multimercado XP", classe: "Fundos / ETFs", balde: "Longo Prazo", valor: 4, liquidez: "D+30", vencimento: "", ultima_atualizacao: "2024-04", historico_valor: Array.from({length:12}, (_,i) => ({mes: `${2023 + Math.floor((4+i)/12)}-${String((4+i)%12 +1).padStart(2,'0')}`, valor: 4 + 0.03 * i})) },
+    { id: 5, inst_id: 3, produto: "Bitcoin", classe: "Cripto", balde: "Longo Prazo", valor: 5, liquidez: "Diária", vencimento: "", ultima_atualizacao: "2024-04", historico_valor: Array.from({length:12}, (_,i) => ({mes: `${2023 + Math.floor((4+i)/12)}-${String((4+i)%12 +1).padStart(2,'0')}`, valor: 5 + 0.1 * i})) },
+    { id: 6, inst_id: 1, produto: "Renda Fixa Meta Viagem Europa", classe: "Renda Fixa", balde: "Metas", valor: 1, liquidez: "No vencimento", vencimento: "", ultima_atualizacao: "2024-04", historico_valor: Array.from({length:12}, (_,i) => ({mes: `${2023 + Math.floor((4+i)/12)}-${String((4+i)%12 +1).padStart(2,'0')}`, valor: 1 + 0.02 * i})) },
+    { id: 7, inst_id: 1, produto: "Renda Fixa Meta Troca de Carro", classe: "Renda Fixa", balde: "Metas", valor: 2, liquidez: "No vencimento", vencimento: "", ultima_atualizacao: "2024-04", historico_valor: Array.from({length:12}, (_,i) => ({mes: `${2023 + Math.floor((4+i)/12)}-${String((4+i)%12 +1).padStart(2,'0')}`, valor: 2 + 0.02 * i})) },
   ],
   metas: [
-    { id: 1, nome: "Viagem Europa", icon: "✈️", cor: "#818cf8", valor_alvo: 15000, prazo: "2026-06", aporte_mensal_alvo: 1000, descricao: "", aportes: [] },
-    { id: 2, nome: "Troca de Carro", icon: "🚗", cor: "#fb923c", valor_alvo: 60000, prazo: "2027-12", aporte_mensal_alvo: 2000, descricao: "", aportes: [] },
+    { id: 1, nome: "Viagem Europa", icon: "✈️", cor: "#818cf8", valor_alvo: 10, prazo: "2026-06", aporte_mensal_alvo: 1, descricao: "", aportes: Array.from({length:10}, (_,i) => ({ id: `meta1-${i+1}`, mes: mesAdd("2023-01", i), valor: 1 })) },
+    { id: 2, nome: "Troca de Carro", icon: "🚗", cor: "#fb923c", valor_alvo: 20, prazo: "2027-12", aporte_mensal_alvo: 2, descricao: "", aportes: Array.from({length:10}, (_,i) => ({ id: `meta2-${i+1}`, mes: mesAdd("2023-01", i), valor: 2 })) },
   ],
   budgets: [
-    { id: 1, categoria: "Moradia", maximo: 3000, icon: "🏠" },
-    { id: 2, categoria: "Alimentação", maximo: 1500, icon: "🍽️" },
-    { id: 3, categoria: "Transporte", maximo: 800, icon: "🚗" },
-    { id: 4, categoria: "Saúde", maximo: 500, icon: "💊" },
-    { id: 5, categoria: "Lazer", maximo: 600, icon: "🎬" },
-    { id: 6, categoria: "Educação", maximo: 400, icon: "📚" },
+    { id: 1, categoria: "Moradia", maximo: 1, icon: "🏠" },
+    { id: 2, categoria: "Alimentação", maximo: 2, icon: "🍽️" },
+    { id: 3, categoria: "Transporte", maximo: 3, icon: "🚗" },
+    { id: 4, categoria: "Saúde", maximo: 4, icon: "💊" },
+    { id: 5, categoria: "Lazer", maximo: 5, icon: "🎬" },
+    { id: 6, categoria: "Educação", maximo: 6, icon: "📚" },
   ],
   ultima_revisao: null,
   revisao_em_andamento: null,
-  bens: [],
+  bens: [
+    { id: 1, tipo: "bem", nome: "Apartamento", valor: 6, ultima_atualizacao: "2024-04", historico_valor: Array.from({length:5}, (_,i) => ({mes: `${2020+i}-12`, valor: 6 + 0.1 * i})) },
+    { id: 2, tipo: "imovel", nome: "Casa", valor: 7, ultima_atualizacao: "2024-04", historico_valor: Array.from({length:5}, (_,i) => ({mes: `${2020+i}-12`, valor: 7 + 0.1 * i})) },
+    { id: 3, tipo: "bem", nome: "Carro", valor: 8, ultima_atualizacao: "2024-04", historico_valor: Array.from({length:5}, (_,i) => ({mes: `${2020+i}-12`, valor: 8 + 0.1 * i})) },
+  ],
   ferramentas: [
-    { id: 1, nome: "Status Invest", url: "https://statusinvest.com.br" },
-    { id: 2, nome: "Tesouro Direto", url: "https://www.tesourodireto.com.br" },
+    { id: 1, nome: "Analisador de Faturas", url: "https://aistudio.google.com/apps/8f2899a5-52e5-41cc-ad07-6d303782094d?fullscreenApplet=true&showPreview=true&showAssistant=true" },
+    { id: 2, nome: "Consultor Financeiro", url: "https://aistudio.google.com/apps/c3c856b1-ea5a-4bdf-a35f-a4997222fe86?fullscreenApplet=true&showPreview=true&showAssistant=true" },
   ],
 };
 
@@ -137,6 +143,12 @@ const mesLabel = mes => {
   return `${meses[+m - 1]} ${y}`;
 };
 
+function valorAtualDoHistorico(item) {
+  const hist = Array.isArray(item?.historico_valor) ? item.historico_valor : [];
+  if (hist.length === 0) return item?.valor || 0;
+  return [...hist].sort((a, b) => b.mes.localeCompare(a.mes))[0]?.valor ?? item.valor ?? 0;
+}
+
 function mesAdd(ym, deltaMeses) {
   const [y, m] = ym.split("-").map(Number);
   const d = new Date(y, m - 1 + deltaMeses, 1);
@@ -160,11 +172,18 @@ function valorNoHistoricoEmOuAntes(hist, mesLimite) {
 }
 
 /** Retorno % simples: valor atual vs referência há `mesesAtras` meses. */
-function rendimentoHistorico(valorAtual, hist, mesesAtras) {
-  const mesRef = mesAdd(mesAtual(), -mesesAtras);
-  const vRef = valorNoHistoricoEmOuAntes(hist, mesRef);
-  if (vRef == null || vRef === 0) return null;
-  return ((valorAtual - vRef) / vRef) * 100;
+function rendimentoHistorico(valorAtual, hist, windows = [1,3,6,12,18,24,36,60]) {
+  const results = {};
+  for (const meses of windows) {
+    const mesRef = mesAdd(mesAtual(), -meses);
+    const vRef = valorNoHistoricoEmOuAntes(hist, mesRef);
+    if (vRef == null || vRef === 0) {
+      results[meses] = null;
+    } else {
+      results[meses] = ((valorAtual - vRef) / vRef) * 100;
+    }
+  }
+  return results;
 }
 
 function revisaoPendente(ultima_revisao) {
@@ -211,11 +230,11 @@ function exportarCSV(data, rendaTotal) {
 
   lines.push(sep("POSIÇÕES"));
   lines.push(row(["Instituição","Produto","Classe de Ativo","Indexação","Balde","Valor (R$)","Liquidez","Vencimento","Última Atualização"]));
-  data.posicoes.forEach(p => lines.push(row([instMap[p.inst_id]||"",p.produto,p.classe,p.indexacao||"",p.balde,p.valor,p.liquidez,p.vencimento||"",p.ultima_atualizacao||""])));
+  data.posicoes.forEach(p => lines.push(row([instMap[p.inst_id]||"",p.produto,p.classe,p.indexacao||"",p.balde,valorAtualDoHistorico(p),p.liquidez,p.vencimento||"",p.ultima_atualizacao||""])));
 
   lines.push(sep("BENS E IMÓVEIS"));
   lines.push(row(["Tipo","Produto","Valor (R$)","Liquidez","Última Atualização"]));
-  (data.bens || []).forEach(b => lines.push(row([b.tipo === "imovel" ? "Imóvel" : "Bem", b.produto, b.valor, b.liquidez, b.ultima_atualizacao || ""])));
+  (data.bens || []).forEach(b => lines.push(row([b.tipo === "imovel" ? "Imóvel" : "Bem", b.produto, valorAtualDoHistorico(b), b.liquidez, b.ultima_atualizacao || ""])));
 
   lines.push(sep("METAS"));
   lines.push(row(["Meta","Valor Alvo (R$)","Acumulado (R$)","Aporte Mensal Alvo (R$)","Prazo","Descrição"]));
@@ -444,16 +463,16 @@ export default function App() {
   const up = (key, val) => setData(d => ({ ...d, [key]: val }));
   const exibir = (n) => oculto ? "•••••" : fmt(n);
   const rendaTotal = data.fontes_renda.reduce((s, f) => s + f.valor, 0);
-  const patrimBens = (data.bens || []).reduce((s, b) => s + (b.valor || 0), 0);
-  const patrimTotal = data.posicoes.reduce((s, p) => s + (p.valor || 0), 0) + patrimBens;
-  const patrimoCP = data.posicoes.filter(p => p.balde === "Curto Prazo").reduce((s, p) => s + p.valor, 0);
-  const patrimoMP = data.posicoes.filter(p => p.balde === "Médio Prazo").reduce((s, p) => s + p.valor, 0);
-  const patrimoLP = data.posicoes.filter(p => p.balde === "Longo Prazo").reduce((s, p) => s + p.valor, 0);
+  const patrimBens = (data.bens || []).reduce((s, b) => s + valorAtualDoHistorico(b), 0);
+  const patrimTotal = data.posicoes.reduce((s, p) => s + valorAtualDoHistorico(p), 0) + patrimBens;
+  const patrimoCP = data.posicoes.filter(p => p.balde === "Curto Prazo").reduce((s, p) => s + valorAtualDoHistorico(p), 0);
+  const patrimoMP = data.posicoes.filter(p => p.balde === "Médio Prazo").reduce((s, p) => s + valorAtualDoHistorico(p), 0);
+  const patrimoLP = data.posicoes.filter(p => p.balde === "Longo Prazo").reduce((s, p) => s + valorAtualDoHistorico(p), 0);
   const patrimoInv = patrimoCP + patrimoMP + patrimoLP;
-  const patrimoRE = data.posicoes.filter(p => p.balde === "Reserva de Emergência").reduce((s, p) => s + p.valor, 0);
-  const patrimoMetas = data.posicoes.filter(p => !BALDES_INV.includes(p.balde) && p.balde !== "Reserva de Emergência").reduce((s, p) => s + p.valor, 0);
+  const patrimoRE = data.posicoes.filter(p => p.balde === "Reserva de Emergência").reduce((s, p) => s + valorAtualDoHistorico(p), 0);
+  const patrimoMetas = data.posicoes.filter(p => !BALDES_INV.includes(p.balde) && p.balde !== "Reserva de Emergência").reduce((s, p) => s + valorAtualDoHistorico(p), 0);
   const alocacaoReal = CLASSES.map(c => {
-    const val = data.posicoes.filter(p => BALDES_INV.includes(p.balde) && p.classe === c).reduce((s, p) => s + p.valor, 0);
+    const val = data.posicoes.filter(p => BALDES_INV.includes(p.balde) && p.classe === c).reduce((s, p) => s + valorAtualDoHistorico(p), 0);
     return { classe: c, valor: val, pct: patrimoInv > 0 ? (val / patrimoInv) * 100 : 0 };
   }).filter(a => a.valor > 0);
   const vencendoBreve = data.posicoes.filter(p => { const m = mesesAte(p.vencimento); return m !== null && m >= 0 && m <= 2; });
@@ -489,7 +508,7 @@ export default function App() {
           <LogoMarca />
           <div>
             <div style={{ fontWeight: 700, fontSize: 14, letterSpacing: -0.3 }}>Plano A</div>
-            <div style={{ fontSize: 10, color: "#334155", letterSpacing: 0.5 }}>v0.7</div>
+            <div style={{ fontSize: 10, color: "#334155", letterSpacing: 0.5 }}>v0.8</div>
           </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -994,6 +1013,7 @@ function SessaoGuiada({ data, up, rendaTotal, vencendoBreve, alocacaoReal, patri
 // DASHBOARD
 // ===============================================================================
 function Dashboard({ data, up, patrimTotal, patrimBens, patrimoInv, patrimoCP, patrimoMP, patrimoLP, patrimoRE, patrimoMetas, alocacaoReal, vencendoBreve, rendaTotal, onIniciarRevisao, exibir }) {
+  const [rendPeriodDash, setRendPeriodDash] = useState({ total: 12, investimentos: 12, reserva: 12, bens: 12 });
   const cfg = data.config;
   const investMensal = rendaTotal * (cfg.taxa_investimento / 100);
   const reservaAlvo = rendaTotal * cfg.reserva_emergencia_meses;
@@ -1011,6 +1031,80 @@ function Dashboard({ data, up, patrimTotal, patrimBens, patrimoInv, patrimoCP, p
     { pct: patrimTotal > 0 ? (patrimBens / patrimTotal) * 100 : 0, color: COLOR_BENS_IMOVEIS },
   ];
 
+  const allPosRends = data.posicoes.map(p => {
+    const valorAtual = valorAtualDoHistorico(p);
+    return { valor: valorAtual, rends: rendimentoHistorico(valorAtual, p.historico_valor) };
+  });
+  const yieldTotal = {};
+  for (const w of [1,3,6,12,18,24,36,60]) {
+    let sumWeighted = 0;
+    let totalWeight = 0;
+    for (const pr of allPosRends) {
+      const r = pr.rends[w];
+      if (r != null) {
+        sumWeighted += pr.valor * r;
+        totalWeight += pr.valor;
+      }
+    }
+    for (const b of data.bens) {
+      const bValorAtual = valorAtualDoHistorico(b);
+      const br = rendimentoHistorico(bValorAtual, b.historico_valor);
+      const r = br[w];
+      if (r != null) {
+        sumWeighted += bValorAtual * r;
+        totalWeight += bValorAtual;
+      }
+    }
+    yieldTotal[w] = totalWeight > 0 ? sumWeighted / totalWeight : null;
+  }
+  const yieldInv = {};
+  for (const w of [1,3,6,12,18,24,36,60]) {
+    let sumWeighted = 0;
+    let totalWeight = 0;
+    for (const pr of allPosRends) {
+      const r = pr.rends[w];
+      if (r != null) {
+        sumWeighted += pr.valor * r;
+        totalWeight += pr.valor;
+      }
+    }
+    yieldInv[w] = totalWeight > 0 ? sumWeighted / totalWeight : null;
+  }
+  const resPosRends = data.posicoes.filter(p => p.balde === "Reserva de Emergência").map(p => {
+    const valorAtual = valorAtualDoHistorico(p);
+    return { valor: valorAtual, rends: rendimentoHistorico(valorAtual, p.historico_valor) };
+  });
+  const yieldRes = {};
+  for (const w of [1,3,6,12,18,24,36,60]) {
+    let sumWeighted = 0;
+    let totalWeight = 0;
+    for (const pr of resPosRends) {
+      const r = pr.rends[w];
+      if (r != null) {
+        sumWeighted += pr.valor * r;
+        totalWeight += pr.valor;
+      }
+    }
+    yieldRes[w] = totalWeight > 0 ? sumWeighted / totalWeight : null;
+  }
+  const bensRends = data.bens.map(b => {
+    const valorAtual = valorAtualDoHistorico(b);
+    return { valor: valorAtual, rends: rendimentoHistorico(valorAtual, b.historico_valor) };
+  });
+  const yieldBens = {};
+  for (const w of [1,3,6,12,18,24,36,60]) {
+    let sumWeighted = 0;
+    let totalWeight = 0;
+    for (const br of bensRends) {
+      const r = br.rends[w];
+      if (r != null) {
+        sumWeighted += br.valor * r;
+        totalWeight += br.valor;
+      }
+    }
+    yieldBens[w] = totalWeight > 0 ? sumWeighted / totalWeight : null;
+  }
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
       {/* Alertas */}
@@ -1018,7 +1112,7 @@ function Dashboard({ data, up, patrimTotal, patrimBens, patrimoInv, patrimoCP, p
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {vencendoBreve.map(p => (
             <div key={p.id} style={{ background: "#1c1408", border: "1px solid #713f12", borderRadius: 10, padding: "10px 14px", fontSize: 12, color: "#fbbf24" }}>
-              ⚡ <strong>{p.produto}</strong> vence em {mesesAte(p.vencimento) === 0 ? "este mês" : `${mesesAte(p.vencimento)} meses`} — {fmt(p.valor)}
+              ⚡ <strong>{p.produto}</strong> vence em {mesesAte(p.vencimento) === 0 ? "este mês" : `${mesesAte(p.vencimento)} meses`} — {fmt(valorAtualDoHistorico(p))}
             </div>
           ))}
           {desvios.map(d => (
@@ -1034,6 +1128,22 @@ function Dashboard({ data, up, patrimTotal, patrimBens, patrimoInv, patrimoCP, p
         <div style={{ fontSize: 10, color: "#334155", textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 4 }}>Patrimônio total</div>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", flexWrap: "wrap", gap: 8 }}>
           <div style={{ fontFamily: "JetBrains Mono", fontSize: 22, fontWeight: 600, color: "#4ade80" }}>{exibir(patrimTotal)}</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <select value={String(rendPeriodDash.total)} onChange={e => setRendPeriodDash(r => ({ ...r, total: +e.target.value }))} style={{ ...IS, width: "auto", padding: "4px 8px", fontSize: 11 }}>
+              <option value="1">1m</option>
+              <option value="3">3m</option>
+              <option value="6">6m</option>
+              <option value="12">12m</option>
+              <option value="18">18m</option>
+              <option value="24">24m</option>
+              <option value="36">36m</option>
+              <option value="60">60m</option>
+            </select>
+            <div style={{ textAlign: "right", minWidth: 56 }}>
+              <div style={{ fontSize: 10, color: "#64748b" }}>Rend.</div>
+              <div style={{ fontFamily: "JetBrains Mono", fontSize: 12, color: yieldTotal[rendPeriodDash.total] != null ? (yieldTotal[rendPeriodDash.total] >= 0 ? "#4ade80" : "#f87171") : "#334155" }}>{yieldTotal[rendPeriodDash.total] != null ? pct(yieldTotal[rendPeriodDash.total]) : "—"}</div>
+            </div>
+          </div>
           <div style={{ fontSize: 12, color: "#64748b" }}>Meta: {pct(progMeta)}</div>
         </div>
       </div>
@@ -1041,15 +1151,31 @@ function Dashboard({ data, up, patrimTotal, patrimBens, patrimoInv, patrimoCP, p
       {/* KPIs — ordem: Investimentos, Reserva, Bens, Renda */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(155px,1fr))", gap: 10 }}>
         {[
-          { label: "Investimentos", val: exibir(patrimoInv), sub: `${pct(patrimTotal > 0 ? patrimoInv/patrimTotal*100 : 0)} do total`, c: "#4ade80" },
-          { label: "Reserva", val: exibir(patrimoRE), sub: `Alvo ${exibir(reservaAlvo)}`, c: patrimoRE >= reservaAlvo ? "#4ade80" : "#f59e0b" },
-          { label: "Bens e Imóveis", val: exibir(patrimBens), sub: `${pct(patrimTotal > 0 ? patrimBens/patrimTotal*100 : 0)} do total`, c: COLOR_BENS_IMOVEIS },
-          { label: "Renda Mensal", val: exibir(rendaTotal), sub: `${data.fontes_renda.length} fonte${data.fontes_renda.length !== 1 ? "s" : ""}`, c: "#a78bfa" },
+          { label: "Investimentos", val: exibir(patrimoInv), sub: `${pct(patrimTotal > 0 ? patrimoInv/patrimTotal*100 : 0)} do total`, c: "#4ade80", yieldObj: yieldInv, stateKey: "investimentos" },
+          { label: "Reserva", val: exibir(patrimoRE), sub: `Alvo ${exibir(reservaAlvo)}`, c: patrimoRE >= reservaAlvo ? "#4ade80" : "#f59e0b", yieldObj: yieldRes, stateKey: "reserva" },
+          { label: "Bens e Imóveis", val: exibir(patrimBens), sub: `${pct(patrimTotal > 0 ? patrimBens/patrimTotal*100 : 0)} do total`, c: COLOR_BENS_IMOVEIS, yieldObj: yieldBens, stateKey: "bens" },
+          { label: "Renda Mensal", val: exibir(rendaTotal), sub: `${data.fontes_renda.length} fonte${data.fontes_renda.length !== 1 ? "s" : ""}`, c: "#a78bfa", yieldObj: null },
         ].map((k, i) => (
           <div key={i} style={{ background: "#0f172a", border: "1px solid #1e293b", borderRadius: 12, padding: 14 }}>
             <div style={{ fontSize: 10, color: "#334155", textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 6 }}>{k.label}</div>
             <div style={{ fontFamily: "JetBrains Mono", fontSize: 18, fontWeight: 500, color: "#f1f5f9" }}>{k.val}</div>
             <div style={{ fontSize: 11, color: k.c, marginTop: 4 }}>{k.sub}</div>
+            {k.yieldObj && (
+              <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 6 }}>
+                <select value={String(rendPeriodDash[k.stateKey])} onChange={e => setRendPeriodDash(r => ({ ...r, [k.stateKey]: +e.target.value }))} style={{ ...IS, width: "auto", padding: "2px 4px", fontSize: 10 }}>
+                  <option value="1">1m</option>
+                  <option value="3">3m</option>
+                  <option value="6">6m</option>
+                  <option value="12">12m</option>
+                  <option value="18">18m</option>
+                  <option value="24">24m</option>
+                  <option value="36">36m</option>
+                  <option value="60">60m</option>
+                </select>
+                <div style={{ fontSize: 10, color: "#64748b" }}>Rend.</div>
+                <div style={{ fontFamily: "JetBrains Mono", fontSize: 11, color: k.yieldObj[rendPeriodDash[k.stateKey]] != null ? (k.yieldObj[rendPeriodDash[k.stateKey]] >= 0 ? "#4ade80" : "#f87171") : "#334155" }}>{k.yieldObj[rendPeriodDash[k.stateKey]] != null ? pct(k.yieldObj[rendPeriodDash[k.stateKey]]) : "—"}</div>
+              </div>
+            )}
           </div>
         ))}
       </div>
@@ -1187,7 +1313,9 @@ function BensImoveis({ data, up, exibir }) {
 
       {bens.map(bem => {
         const atraso = mesesDesde(bem.ultima_atualizacao);
-        const r5 = rendimentoHistorico(bem.valor, bem.historico_valor, MESES_REND_BENS);
+        const valorAtual = valorAtualDoHistorico(bem);
+        const rends = rendimentoHistorico(valorAtual, bem.historico_valor);
+        const r5 = rends[60];
         const exp = expandHist[bem.id];
         const hist = [...(bem.historico_valor || [])].sort((a, x) => x.mes.localeCompare(a.mes));
         return editId === bem.id ? (
@@ -1211,7 +1339,7 @@ function BensImoveis({ data, up, exibir }) {
                   <div style={{ fontFamily: "JetBrains Mono", fontSize: 13, color: r5 != null ? (r5 >= 0 ? "#4ade80" : "#f87171") : "#334155" }}>{r5 != null ? pct(r5) : "—"}</div>
                 </div>
                 <div style={{ textAlign: "right" }}>
-                  <div style={{ fontFamily: "JetBrains Mono", fontSize: 16, color: "#e2e8f0" }}>{exibir(bem.valor)}</div>
+                  <div style={{ fontFamily: "JetBrains Mono", fontSize: 16, color: "#e2e8f0" }}>{exibir(valorAtual)}</div>
                 </div>
                 <div style={{ display: "flex", gap: 4 }}>
                   <button type="button" onClick={() => setEditId(bem.id)} style={{ background: "none", border: "none", color: "#334155", cursor: "pointer" }}>✎</button>
@@ -1273,7 +1401,9 @@ function LinhaPosicao({ pos, totalGeral, exibir, onEdit, onDelete, periodoMeses,
   const [expandHist, setExpandHist] = useState(false);
   const atraso = mesesDesde(pos.ultima_atualizacao);
   const venc = pos.vencimento ? mesesAte(pos.vencimento) : null;
-  const r = rendimentoHistorico(pos.valor, pos.historico_valor, periodoMeses);
+  const valorAtual = valorAtualDoHistorico(pos);
+  const rends = rendimentoHistorico(valorAtual, pos.historico_valor);
+  const r = rends[periodoMeses];
   const hist = [...(pos.historico_valor || [])].sort((a, b) => b.mes.localeCompare(a.mes));
   return (
     <div style={{ padding: "10px 0", borderBottom: "1px solid #0a0f1a" }}>
@@ -1292,18 +1422,22 @@ function LinhaPosicao({ pos, totalGeral, exibir, onEdit, onDelete, periodoMeses,
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
           <select value={String(periodoMeses)} onChange={e => onPeriodo(+e.target.value)} style={{ ...IS, width: "auto", padding: "4px 8px", fontSize: 11 }}>
-            <option value="1">1 m</option>
-            <option value="3">3 m</option>
-            <option value="6">6 m</option>
-            <option value="12">12 m</option>
+            <option value="1">1m</option>
+            <option value="3">3m</option>
+            <option value="6">6m</option>
+            <option value="12">12m</option>
+            <option value="18">18m</option>
+            <option value="24">24m</option>
+            <option value="36">36m</option>
+            <option value="60">60m</option>
           </select>
           <div style={{ textAlign: "right", minWidth: 56 }}>
             <div style={{ fontSize: 10, color: "#64748b" }}>Rend.</div>
             <div style={{ fontFamily: "JetBrains Mono", fontSize: 12, color: r != null ? (r >= 0 ? "#4ade80" : "#f87171") : "#334155" }}>{r != null ? pct(r) : "—"}</div>
           </div>
           <div style={{ textAlign: "right" }}>
-            <div style={{ fontFamily: "JetBrains Mono", fontSize: 14 }}>{exibir(pos.valor)}</div>
-            <div style={{ fontSize: 10, color: "#334155" }}>{pct(totalGeral > 0 ? pos.valor / totalGeral * 100 : 0)}</div>
+            <div style={{ fontFamily: "JetBrains Mono", fontSize: 14 }}>{exibir(valorAtual)}</div>
+            <div style={{ fontSize: 10, color: "#334155" }}>{pct(totalGeral > 0 ? valorAtual / totalGeral * 100 : 0)}</div>
           </div>
           <div style={{ display: "flex", gap: 4 }}>
             <button type="button" onClick={onEdit} style={{ background: "none", border: "none", color: "#334155", cursor: "pointer" }}>✎</button>
@@ -1340,8 +1474,9 @@ function Posicoes({ data, up, exibir }) {
   const [novaInstForm, setNovaInstForm] = useState(false);
   const [instForm, setInstForm] = useState({ nome: "", icon: "🏦" });
   const [expandInst, setExpandInst] = useState({});
-  const [rendPeriod, setRendPeriod] = useState({});
-  const totalGeral = data.posicoes.reduce((s, p) => s + p.valor, 0);
+  const [rendInstPeriod, setRendInstPeriod] = useState({});
+  const [rendPosPeriod, setRendPosPeriod] = useState({});
+  const totalGeral = data.posicoes.reduce((s, p) => s + valorAtualDoHistorico(p), 0);
 
   function savePosicao(pos) {
     const prev = pos.id ? data.posicoes.find(p => p.id === pos.id) : null;
@@ -1407,8 +1542,26 @@ function Posicoes({ data, up, exibir }) {
 
       {data.instituicoes.map(inst => {
         const posList = data.posicoes.filter(p => p.inst_id === inst.id);
-        const totalInst = posList.reduce((s, p) => s + p.valor, 0);
+        const totalInst = posList.reduce((s, p) => s + valorAtualDoHistorico(p), 0);
         const expanded = expandInst[inst.id] !== false;
+        const posRends = posList.map(p => {
+          const valorAtual = valorAtualDoHistorico(p);
+          return { valor: valorAtual, rends: rendimentoHistorico(valorAtual, p.historico_valor) };
+        });
+        const yieldInst = {};
+        for (const w of [1,3,6,12,18,24,36,60]) {
+          let sumWeighted = 0;
+          let totalWeight = 0;
+          for (const pr of posRends) {
+            const r = pr.rends[w];
+            if (r != null) {
+              sumWeighted += pr.valor * r;
+              totalWeight += pr.valor;
+            }
+          }
+          yieldInst[w] = totalWeight > 0 ? sumWeighted / totalWeight : null;
+        }
+        const instRendPeriod = rendInstPeriod[inst.id] || 12;
         return (
           <div key={inst.id} style={{ background: "#0f172a", border: "1px solid #1e293b", borderRadius: 14, overflow: "hidden" }}>
             <div onClick={() => setExpandInst(e => ({ ...e, [inst.id]: !expanded }))}
@@ -1417,6 +1570,22 @@ function Posicoes({ data, up, exibir }) {
               <div style={{ flex: 1 }}>
                 <div style={{ fontWeight: 600, fontSize: 14 }}>{inst.nome}</div>
                 <div style={{ fontSize: 11, color: "#475569" }}>{posList.length} produto{posList.length !== 1 ? "s" : ""}</div>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <select value={String(instRendPeriod)} onChange={e => setRendInstPeriod(r => ({ ...r, [inst.id]: +e.target.value }))} style={{ ...IS, width: "auto", padding: "4px 8px", fontSize: 11 }}>
+                  <option value="1">1m</option>
+                  <option value="3">3m</option>
+                  <option value="6">6m</option>
+                  <option value="12">12m</option>
+                  <option value="18">18m</option>
+                  <option value="24">24m</option>
+                  <option value="36">36m</option>
+                  <option value="60">60m</option>
+                </select>
+                <div style={{ textAlign: "right", minWidth: 56 }}>
+                  <div style={{ fontSize: 10, color: "#64748b" }}>Rend.</div>
+                  <div style={{ fontFamily: "JetBrains Mono", fontSize: 12, color: yieldInst[instRendPeriod] != null ? (yieldInst[instRendPeriod] >= 0 ? "#4ade80" : "#f87171") : "#334155" }}>{yieldInst[instRendPeriod] != null ? pct(yieldInst[instRendPeriod]) : "—"}</div>
+                </div>
               </div>
               <div style={{ fontFamily: "JetBrains Mono", fontSize: 14, color: "#e2e8f0" }}>{exibir(totalInst)}</div>
               <span style={{ fontSize: 11, color: "#334155" }}>{expanded ? "▲" : "▼"}</span>
@@ -1432,8 +1601,8 @@ function Posicoes({ data, up, exibir }) {
                       pos={pos}
                       totalGeral={totalGeral}
                       exibir={exibir}
-                      periodoMeses={rendPeriod[pos.id] ?? 1}
-                      onPeriodo={(n) => setRendPeriod(r => ({ ...r, [pos.id]: n }))}
+                      periodoMeses={rendPosPeriod[pos.id] ?? 12}
+                      onPeriodo={(n) => setRendPosPeriod(r => ({ ...r, [pos.id]: n }))}
                       onEdit={() => setEditId(pos.id)}
                       onDelete={() => delPosicao(pos.id)}
                     />
@@ -1509,7 +1678,7 @@ function Alocacao({ data, up, alocacaoReal, patrimoInv, exibir }) {
     const m = new Map();
     posInv.forEach(p => {
       const k = keyFn(p) || "Não classificado";
-      m.set(k, (m.get(k) || 0) + (p.valor || 0));
+      m.set(k, (m.get(k) || 0) + valorAtualDoHistorico(p));
     });
     const out = Array.from(m.entries()).map(([k, v]) => ({ k, v, pct: patrimoInv > 0 ? (v / patrimoInv) * 100 : 0 }));
     out.sort((a, b) => b.v - a.v);
@@ -1691,7 +1860,13 @@ function Metas({ data, up, exibir }) {
     up("metas", data.metas.map(m => m.id === metaId ? { ...m, aportes: [...(m.aportes || []), aporte] } : m));
   }
   function delAporte(metaId, aid) {
-    up("metas", data.metas.map(m => m.id === metaId ? { ...m, aportes: m.aportes.filter(a => a.id !== aid) } : m));
+    up("metas", data.metas.map(m => m.id === metaId ? {
+      ...m,
+      aportes: (m.aportes || []).filter(a => {
+        if (a.id != null) return a.id !== aid;
+        return `${a.mes}|${a.valor}` !== aid;
+      }),
+    } : m));
   }
 
   return (
