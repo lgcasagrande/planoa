@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import CryptoJS from 'crypto-js';
 
 // --- Storage ------------------------------------------------------------------
 const LS_KEY = "portfolioiq_v3";
@@ -201,7 +202,19 @@ function diasSemRevisao(ultima_revisao) {
 // --- Export / Import — sem dependência CDN ------------------------------------
 // Exporta como JSON (backup completo) + dispara download
 function exportarJSON(data) {
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+  const criptografar = confirm("Deseja criptografar o arquivo com senha? (OK = Sim, Cancelar = Não)");
+  let content = JSON.stringify(data, null, 2);
+  
+  if (criptografar) {
+    const senha = prompt("Digite uma senha para criptografar o arquivo:");
+    if (!senha) {
+      alert("Exportação cancelada: senha necessária para criptografia.");
+      return;
+    }
+    content = CryptoJS.AES.encrypt(content, senha).toString();
+  }
+  
+  const blob = new Blob([content], { type: "application/json" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
@@ -292,7 +305,17 @@ function importarJSON(file, onSuccess, onError) {
   const reader = new FileReader();
   reader.onload = e => {
     try {
-      const novo = JSON.parse(e.target.result);
+      const senha = prompt("Digite a senha se o arquivo for criptografado (ou deixe em branco):");
+      let jsonString = e.target.result;
+      
+      if (senha) {
+        const decrypted = CryptoJS.AES.decrypt(e.target.result, senha).toString(CryptoJS.enc.Utf8);
+        if (decrypted) {
+          jsonString = decrypted;
+        }
+      }
+      
+      const novo = JSON.parse(jsonString);
       if (!novo.posicoes || !novo.metas || !novo.config) throw new Error("Arquivo inválido ou incompleto.");
       onSuccess(normalizeData(novo));
     } catch(err) { onError(err.message); }
@@ -508,7 +531,7 @@ export default function App() {
           <LogoMarca />
           <div>
             <div style={{ fontWeight: 700, fontSize: 14, letterSpacing: -0.3 }}>Plano A</div>
-            <div style={{ fontSize: 10, color: "#334155", letterSpacing: 0.5 }}>v0.8</div>
+            <div style={{ fontSize: 10, color: "#334155", letterSpacing: 0.5 }}>v0.9</div>
           </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
